@@ -1,9 +1,10 @@
 # indexer (Josh)
 
-MVP0: builds one binary that creates a valid SQLite DB with dummy rows.
+Walks a workspace of `.ts`/`.tsx` files and writes `files` / `nodes` / `edges`
+per `contracts.md` (stable `path::name::type` ids, WAL, 1-indexed lines).
 
 ```sh
-cmake -B build -S .
+cmake -B build -S .   # first configure downloads tree-sitter (~1 min, needs network)
 cmake --build build
 ./build/indexer <workspace_path> <db_path>
 ```
@@ -11,7 +12,15 @@ cmake --build build
 Check the output:
 
 ```sh
-sqlite3 <db_path> "SELECT * FROM nodes;"
+sqlite3 <db_path> "SELECT id,start_line,end_line FROM nodes WHERE type!='file';"
 ```
 
-Next: walker (`node_modules/.git/dist` skip + SHA-256) then tree-sitter TSX parsing in `src/parse.cpp`.
+Pipeline per run: schema (+PK/indexes) → walker (skip
+`node_modules/.git/dist`, SHA-256, file nodes, reindex delete) → parser
+(tree-sitter TS/TSX, `queries/tsx.scm`, symbol nodes + `DEFINES` edges).
+
+Collision rule: first symbol keeps the clean id, later same-name same-file
+symbols get `#<start_line>`.
+
+Next: `CALLS` edges by callee-name matching, then `IMPORTS` + `sample.db`
+from the contract mock graph.

@@ -1,6 +1,7 @@
 #include <iostream>
 #include "db.h"
 #include "walker.h"
+#include "parse.h"
 
 // Usage: indexer <workspace_path> <db_path>
 int main(int argc, char** argv) {
@@ -23,7 +24,13 @@ int main(int argc, char** argv) {
     std::cerr << "walk failed\n";
     return 1;
   }
+  int s = index_symbols(workspace, db_path);
+  if (s < 0) {
+    std::cerr << "parse failed\n";
+    return 1;
+  }
 
-  std::cout << "indexed " << n << " ts/tsx files -> " << db_path << "\n";
+  std::cout << "indexed " << n << " ts/tsx files, " << s << " symbols -> "
+            << db_path << "\n";
   return 0;
 }
