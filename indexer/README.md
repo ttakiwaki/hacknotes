@@ -33,4 +33,9 @@ workspace; bare packages and missing targets are dropped.
 line numbers. Regenerate the root `sample.db` with:
 `./build/indexer sample-workspace ../sample.db`
 
-Next: incremental reparse (skip unchanged files by hash), then PR to `main`.
+Incremental: files whose SHA-256 matches `files.hash` are skipped
+(no-op reruns skip parsing entirely); deleted files are purged with their
+nodes and touching edges. A change in any file triggers a full reparse so
+CALLS stay consistent (no stale incoming edges after renames).
+
+Next: PR to `main`.
