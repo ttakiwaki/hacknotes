@@ -22,5 +22,8 @@ Pipeline per run: schema (+PK/indexes) → walker (skip
 Collision rule: first symbol keeps the clean id, later same-name same-file
 symbols get `#<start_line>`.
 
-Next: `CALLS` edges by callee-name matching, then `IMPORTS` + `sample.db`
-from the contract mock graph.
+CALLS resolution: same-file definition wins, else a unique repo-wide
+definition, else skipped as ambiguous; calls to unknown names are dropped
+(no dangling edges). Top-level calls have no function caller and are skipped.
+
+Next: `IMPORTS` (file->file) + `sample.db` from the contract mock graph.
