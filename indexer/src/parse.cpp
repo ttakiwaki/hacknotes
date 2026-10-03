@@ -24,6 +24,14 @@ const TSLanguage* tree_sitter_python(void);
 #define QUERIES_DIR "queries"
 #endif
 
+static std::string g_queries_dir;  // runtime override via set_queries_dir
+
+void set_queries_dir(const std::string& dir) { g_queries_dir = dir; }
+
+static const char* queries_dir() {
+  return g_queries_dir.empty() ? QUERIES_DIR : g_queries_dir.c_str();
+}
+
 // One entry per supported family. Pattern indices are positions inside that
 // family's own query file (tsx.scm and js.scm share the same layout).
 struct Lang {
@@ -154,7 +162,8 @@ static std::string resolve_import(const std::string& workspace,
   return try_cands(base, {"/index.ts", "/index.tsx", "/index.js", "/index.jsx"});
 }
 
-int index_symbols(const std::string& workspace, const std::string& db_path) {
+int index_symbols(const std::string& workspace, const std::string& db_path,
+                  bool quiet) {
   // One compiled query per language (tsx.scm source is shared by .ts/.tsx).
   struct Loaded {
     const Lang* lang;
@@ -165,9 +174,9 @@ int index_symbols(const std::string& workspace, const std::string& db_path) {
   std::unordered_map<std::string, std::string> query_text;
   for (const Lang* L : all_langs) {
     if (!query_text.count(L->query_file)) {
-      const std::string src = read_file(fs::path(QUERIES_DIR) / L->query_file);
+      const std::string src = read_file(fs::path(queries_dir()) / L->query_file);
       if (src.empty()) {
-        std::cerr << "cannot read " << QUERIES_DIR << "/" << L->query_file << "\n";
+        std::cerr << "cannot read " << queries_dir() << "/" << L->query_file << "\n";
         return -1;
       }
       query_text[L->query_file] = src;
@@ -372,8 +381,9 @@ int index_symbols(const std::string& workspace, const std::string& db_path) {
   for (const auto& ld : loaded) ts_query_delete(ld.query);
   ts_parser_delete(parser);
   sqlite3_close(db);
-  std::cout << "calls: " << calls << " (ambiguous skipped: " << skipped_ambiguous
-            << ", external/dangling skipped: " << skipped_external << ")\n"
-            << "imports: " << imports << "\n";
+  if (!quiet)
+    std::cout << "calls: " << calls << " (ambiguous skipped: " << skipped_ambiguous
+              << ", external/dangling skipped: " << skipped_external << ")\n"
+              << "imports: " << imports << "\n";
   return symbols;
 }

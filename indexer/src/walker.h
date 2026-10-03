@@ -7,6 +7,9 @@
 // Unchanged files are skipped; files deleted from disk are purged with
 // their nodes and touching edges. Fills `changed` with the workspace-
 // relative paths that were (re)indexed and sets `purged` to the deleted
-// file count. Returns changed count, -1 on error.
+// file count. When `force` is true every file is reindexed regardless of
+// hash. `quiet` suppresses the run summary (errors still print).
+// Returns changed count, -1 on error.
 int index_workspace(const std::string& workspace, const std::string& db_path,
-                    std::vector<std::string>& changed, int& purged);
+                    std::vector<std::string>& changed, int& purged,
+                    bool force = false, bool quiet = false);

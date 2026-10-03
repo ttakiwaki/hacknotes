@@ -1,18 +1,21 @@
 # indexer (Josh)
 
 Walks a workspace of `.ts`/`.tsx`/`.js`/`.jsx`/`.py` files and writes
-`files` / `nodes` / `edges` per `contracts.md` (stable `path::name::type`
+`files` / `nodes` / `edges` per `CONTRACTS.md` (stable `path::name::type`
 ids, WAL, 1-indexed lines).
 
 ```sh
 cmake -B build -S .   # first configure downloads tree-sitter (~1 min, needs network)
 cmake --build build
-./build/indexer <workspace_path|git_url> <db_path>
+./build/indexer [options] <workspace_path|git_url> <db_path>
+./build/indexer --help      # all flags: --db, --full, --clean, --queries,
+                            # -q/--quiet, -v/--verbose, --version
 ```
 
 A `https://`, `git@`, or `ssh://` arg is shallow-cloned to a temp dir and
 indexed from there (private repos work when `git` itself can auth); the
-clone is deleted afterwards.
+clone is deleted afterwards. Plain `indexer WS DB` still works, so existing
+scripts keep running. Exit codes: 0 ok, 1 runtime error, 2 bad usage.
 
 Check the output:
 

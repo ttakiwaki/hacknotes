@@ -64,7 +64,8 @@ static std::string stored_hash(sqlite3* db, const std::string& rel) {
 }
 
 int index_workspace(const std::string& workspace, const std::string& db_path,
-                    std::vector<std::string>& changed, int& purged) {
+                    std::vector<std::string>& changed, int& purged,
+                    bool force, bool quiet) {
   sqlite3* db = nullptr;
   if (sqlite3_open(db_path.c_str(), &db) != SQLITE_OK) {
     std::cerr << "cannot open db: " << db_path << "\n";
@@ -101,8 +102,9 @@ int index_workspace(const std::string& workspace, const std::string& db_path,
     if (ec) { std::cerr << "relative-path error: " << p << "\n"; ec.clear(); continue; }
     seen.insert(rel);
 
-    // Incremental: unchanged hash means nodes/edges are already correct.
-    if (stored_hash(db, rel) == hex) { ++skipped; continue; }
+    // Incremental: unchanged hash means nodes/edges are already correct
+    // (--full forces a reparse of everything).
+    if (!force && stored_hash(db, rel) == hex) { ++skipped; continue; }
 
     const std::string fname = p.filename().string();
     const std::string id = rel + "::" + fname + "::file";
@@ -145,8 +147,9 @@ int index_workspace(const std::string& workspace, const std::string& db_path,
     }
   }
 
-  std::cout << "walk: " << changed.size() << " changed, " << skipped
-            << " unchanged skipped, " << purged << " deleted purged\n";
+  if (!quiet)
+    std::cout << "walk: " << changed.size() << " changed, " << skipped
+              << " unchanged skipped, " << purged << " deleted purged\n";
   sqlite3_close(db);
   return (int)changed.size();
 }
