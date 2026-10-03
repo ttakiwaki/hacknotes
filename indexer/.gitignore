@@ -1,0 +1,6 @@
+build/
+*.db
+*.db-wal
+*.db-shm
+# clangd symlink -> build/compile_commands.json (local editor only)
+compile_commands.json
