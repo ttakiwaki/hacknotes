@@ -7,3 +7,5 @@ __pycache__/
 .pytest_cache/
 index.db
 embeddings/dev/
+node_modules
+package-lock.json

@@ -7,5 +7,11 @@
     "lint": "npm --prefix frontend run lint",
     "preview": "npm --prefix frontend run preview",
     "start-server": "uvicorn server.main:app --port 8000 --reload"
+  },
+  "devDependencies": {
+    "@rolldown/plugin-babel": "^0.2.4",
+    "@vitejs/plugin-react": "^6.1.1",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "vite": "^8.3.2"
   }
 }

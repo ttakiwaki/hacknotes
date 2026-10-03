@@ -1,7 +1,7 @@
 import os
 from typing import AsyncGenerator, Optional, Callable
 from openai import AsyncOpenAI
-from graph_engine import GraphEngine
+from server.graph_engine import GraphEngine
 
 
 class LLMAgent:

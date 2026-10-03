@@ -7,7 +7,7 @@ import numpy as np
 from embeddings import config
 from embeddings.db import connect
 from embeddings.providers import EmbeddingProvider, get_provider
-from embeddings.types import SymbolHit
+from embeddings.custom_types import SymbolHit
 from embeddings.vectors import cosine_scores, from_blob
 
 

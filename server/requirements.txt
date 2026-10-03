@@ -1,0 +1,7 @@
+git fastapi
+uvicorn
+websockets
+networkx
+openai
+pydantic
+python-dotenv

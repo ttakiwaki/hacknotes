@@ -3,7 +3,7 @@ import sqlite3
 import networkx as nx
 from typing import Optional, List, Tuple
 
-from contracts import GraphNode, GraphEdge
+from server.contracts import GraphNode, GraphEdge
 
 
 class GraphEngine:

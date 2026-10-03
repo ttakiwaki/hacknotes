@@ -5,7 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
-from contracts import (
+from server.contracts import (
     AskAI,
     ChatDone,
     ChatToken,
@@ -15,8 +15,8 @@ from contracts import (
     NodeClicked,
     NodeSnippet,
 )
-from graph_engine import GraphEngine
-from llm_agent import LLMAgent
+from server.graph_engine import GraphEngine
+from server.llm_agent import LLMAgent
 
 # Attempt importing Victor's search_symbols library
 try:
