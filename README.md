@@ -76,7 +76,36 @@ python -m unittest embeddings.test_embeddings
 
 ## Josh — indexer (`indexer/`)
 
-C++17 CLI: `indexer <workspace_path> <db_path>` — not wired up yet.
+C++17 CLI. Walks a workspace (`.ts` / `.tsx` / `.js` / `.jsx` / `.py`),
+parses it with tree-sitter, and writes the `files` / `nodes` / `edges`
+contract tables (stable `path::name::type` ids, WAL, 1-indexed lines).
+CALLS by name matching (same-file wins, else unique repo-wide, else
+skipped), IMPORTS file→file (relative + py dotted names), incremental by
+file hash (unchanged files skipped, deleted files purged).
+
+Build (first configure downloads the tree-sitter grammars, needs network):
+
+```bash
+cmake -B indexer/build -S indexer
+cmake --build indexer/build
+```
+
+Run:
+
+```bash
+./indexer/build/indexer <workspace_path|git_url> <db_path>
+./indexer/build/indexer --help   # --db, --full, --clean, --queries, -q/-v
+```
+
+Git URLs are shallow-cloned to a temp dir and deleted after (private repos
+work when `git` itself can auth). Reruns skip unchanged files; `--full`
+forces a reparse, `--clean` wipes the db first. Exit codes: 0 ok, 1 runtime
+error, 2 bad usage.
+
+Root `sample.db` is the CONTRACTS.md Section 7 mock graph (7 nodes,
+9 edges), regenerable via
+`./indexer/build/indexer indexer/sample-workspace sample.db`.
+Full docs in `indexer/CHANGES.md`.
 
 ## Ben — server (`server/`)
 
@@ -89,4 +118,5 @@ React + Vite on port 5173 — not wired up yet.
 ## Status
 
 - Victor: embeddings index + `search_symbols` ready; mock seed for hour one.
-- Josh / Ben / Cameron: folders only so far.
+- Josh: indexer pipeline complete (walk, parse, CALLS/IMPORTS, incremental, `sample.db`).
+- Ben / Cameron: see their sections.
