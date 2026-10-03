@@ -11,7 +11,8 @@ find_package(SQLite3 REQUIRED)
 add_executable(indexer
   src/main.cpp
   src/db.cpp
+  src/walker.cpp
 )
 
-target_include_directories(indexer PRIVATE src)
+target_include_directories(indexer PRIVATE src third_party)
 target_link_libraries(indexer PRIVATE SQLite::SQLite3)

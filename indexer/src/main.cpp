@@ -1,8 +1,8 @@
 #include <iostream>
 #include "db.h"
+#include "walker.h"
 
 // Usage: indexer <workspace_path> <db_path>
-// MVP0: ignores workspace contents, just creates schema + dummy rows.
 int main(int argc, char** argv) {
   if (argc != 3) {
     std::cerr << "usage: indexer <workspace_path> <db_path>\n";
@@ -18,11 +18,12 @@ int main(int argc, char** argv) {
     std::cerr << "schema creation failed\n";
     return 1;
   }
-  if (!insert_dummy_rows(db_path)) {
-    std::cerr << "dummy insert failed\n";
+  int n = index_workspace(workspace, db_path);
+  if (n < 0) {
+    std::cerr << "walk failed\n";
     return 1;
   }
 
-  std::cout << "MVP0 db ready (schema + 1 dummy function)\n";
+  std::cout << "indexed " << n << " ts/tsx files -> " << db_path << "\n";
   return 0;
 }

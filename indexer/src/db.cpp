@@ -57,27 +57,3 @@ bool create_schema(const std::string& db_path) {
   sqlite3_close(db);
   return ok;
 }
-
-bool insert_dummy_rows(const std::string& db_path) {
-  sqlite3* db = nullptr;
-  if (sqlite3_open(db_path.c_str(), &db) != SQLITE_OK) {
-    std::cerr << "cannot open db: " << db_path << "\n";
-    if (db) sqlite3_close(db);
-    return false;
-  }
-
-  bool ok = true;
-  ok = ok && exec_sql(db,
-    "INSERT OR REPLACE INTO files (path, hash) VALUES "
-    "('src/sample.ts', 'dummyfilehash');");
-  ok = ok && exec_sql(db,
-    "INSERT OR REPLACE INTO nodes (id, type, name, path, start_line, end_line, hash) VALUES "
-    "('src/sample.ts::sample.ts::file', 'file', 'sample.ts', 'src/sample.ts', 1, 10, 'dummyfilehash'),"
-    "('src/sample.ts::hello::function', 'function', 'hello', 'src/sample.ts', 2, 5, 'dummyfn hash');");
-  ok = ok && exec_sql(db,
-    "INSERT OR REPLACE INTO edges (source_id, target_id, type) VALUES "
-    "('src/sample.ts::sample.ts::file', 'src/sample.ts::hello::function', 'DEFINES');");
-
-  sqlite3_close(db);
-  return ok;
-}
