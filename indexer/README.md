@@ -29,4 +29,8 @@ definition, else skipped as ambiguous; calls to unknown names are dropped
 IMPORTS: relative paths resolved to `.ts`/`.tsx`/`index` files in the
 workspace; bare packages and missing targets are dropped.
 
-Next: `sample.db` from the contract mock graph.
+`sample-workspace/` is the contract mock (pool/users/server) with exact
+line numbers. Regenerate the root `sample.db` with:
+`./build/indexer sample-workspace ../sample.db`
+
+Next: incremental reparse (skip unchanged files by hash), then PR to `main`.
