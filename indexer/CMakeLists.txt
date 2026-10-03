@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 project(indexer LANGUAGES C CXX)
 
+# We fetch grammar sources download-only (see below): their own
+# CMakeLists.txt files assume a top-level checkout and define colliding
+# target names, so FetchContent_MakeAvailable cannot be used. CMP0169
+# deprecates direct Populate calls; keep the OLD behavior explicitly.
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 OLD)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
