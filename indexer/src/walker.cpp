@@ -16,7 +16,8 @@ static const std::unordered_set<std::string> SKIP_DIRS = {
 
 static bool is_target(const fs::path& p) {
   const std::string ext = p.extension().string();
-  return ext == ".ts" || ext == ".tsx";
+  return ext == ".ts" || ext == ".tsx" || ext == ".js" || ext == ".jsx" ||
+         ext == ".py";
 }
 
 // Binds every param as text; SQLite coerces numerics into INTEGER columns.

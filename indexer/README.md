@@ -29,6 +29,12 @@ definition, else skipped as ambiguous; calls to unknown names are dropped
 IMPORTS: relative paths resolved to `.ts`/`.tsx`/`index` files in the
 workspace; bare packages and missing targets are dropped.
 
+Languages: `.ts`/`.tsx` (tree-sitter-typescript), `.js`/`.jsx`
+(tree-sitter-javascript, same query layout as TS), `.py`
+(tree-sitter-python: `def`/`class`/named `lambda`, `from`/`import` with
+dotted-name resolution to `.py`/`__init__.py`). One query file per family
+(`tsx.scm`, `js.scm`, `py.scm`); pattern indices are per-file.
+
 `sample-workspace/` is the contract mock (pool/users/server) with exact
 line numbers. Regenerate the root `sample.db` with:
 `./build/indexer sample-workspace ../sample.db`
