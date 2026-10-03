@@ -42,8 +42,17 @@ bool create_schema(const std::string& db_path) {
     "CREATE TABLE IF NOT EXISTS edges ("
     "  source_id TEXT NOT NULL,"
     "  target_id TEXT NOT NULL,"
-    "  type TEXT NOT NULL"
+    "  type TEXT NOT NULL,"
+    "  PRIMARY KEY (source_id, target_id, type)"
     ");");
+  ok = ok && exec_sql(db,
+    "CREATE INDEX IF NOT EXISTS idx_nodes_path ON nodes(path);");
+  ok = ok && exec_sql(db,
+    "CREATE INDEX IF NOT EXISTS idx_nodes_name ON nodes(name);");
+  ok = ok && exec_sql(db,
+    "CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id);");
+  ok = ok && exec_sql(db,
+    "CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id);");
 
   sqlite3_close(db);
   return ok;
