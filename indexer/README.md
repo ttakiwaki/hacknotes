@@ -1,13 +1,18 @@
 # indexer (Josh)
 
-Walks a workspace of `.ts`/`.tsx` files and writes `files` / `nodes` / `edges`
-per `contracts.md` (stable `path::name::type` ids, WAL, 1-indexed lines).
+Walks a workspace of `.ts`/`.tsx`/`.js`/`.jsx`/`.py` files and writes
+`files` / `nodes` / `edges` per `contracts.md` (stable `path::name::type`
+ids, WAL, 1-indexed lines).
 
 ```sh
 cmake -B build -S .   # first configure downloads tree-sitter (~1 min, needs network)
 cmake --build build
-./build/indexer <workspace_path> <db_path>
+./build/indexer <workspace_path|git_url> <db_path>
 ```
+
+A `https://`, `git@`, or `ssh://` arg is shallow-cloned to a temp dir and
+indexed from there (private repos work when `git` itself can auth); the
+clone is deleted afterwards.
 
 Check the output:
 
