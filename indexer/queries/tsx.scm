@@ -26,3 +26,10 @@
 ; Constructor calls: new Store() targets the class.
 (new_expression
   constructor: (identifier) @call.name) @call.node
+
+; Module imports: file -> file (resolved in code, bare packages dropped).
+(import_statement
+  source: (string) @imp.path) @imp.node
+
+(export_statement
+  source: (string) @imp.path) @imp.node

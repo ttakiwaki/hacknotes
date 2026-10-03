@@ -67,6 +67,33 @@ static std::string resolve_callee(
   return "";  // ambiguous across files: skip rather than guess
 }
 
+// Resolves "./util" from file `rel` to a workspace-relative path present in
+// `fileset`. Tries .ts/.tsx and index files. Returns "" when unresolvable
+// (bare packages and escapes are treated as external).
+static std::string resolve_import(const std::string& workspace,
+                                  const std::unordered_set<std::string>& fileset,
+                                  const std::string& rel, const std::string& spec) {
+  if (spec.empty() || spec[0] != '.') return "";
+  const fs::path base = (fs::path(workspace) / rel).parent_path() / spec;
+  const std::string ext = base.extension().string();
+  std::vector<fs::path> cands;
+  if (ext == ".ts" || ext == ".tsx") cands.push_back(base);
+  else {
+    cands.push_back(fs::path(base.string() + ".ts"));
+    cands.push_back(fs::path(base.string() + ".tsx"));
+    cands.push_back(base / "index.ts");
+    cands.push_back(base / "index.tsx");
+  }
+  std::error_code ec;
+  for (const auto& c : cands) {
+    const std::string r = fs::relative(c, workspace, ec).generic_string();
+    if (ec) { ec.clear(); continue; }
+    if (r.rfind("..", 0) == 0) continue;
+    if (fileset.count(r)) return r;
+  }
+  return "";
+}
+
 int index_symbols(const std::string& workspace, const std::string& db_path) {
   const std::string query_src = read_file(fs::path(QUERIES_DIR) / "tsx.scm");
   if (query_src.empty()) {
@@ -120,6 +147,7 @@ int index_symbols(const std::string& workspace, const std::string& db_path) {
   std::unordered_map<std::string,
                      std::vector<std::pair<std::string, std::string>>> symmap;  // name -> (rel, id)
   std::unordered_map<std::string, std::string> defmap;  // rel:start_byte -> symbol id
+  const std::unordered_set<std::string> fileset(rels.begin(), rels.end());
   int symbols = 0;
   for (const std::string& rel : rels) {
     const fs::path full = fs::path(workspace) / rel;
@@ -182,6 +210,7 @@ int index_symbols(const std::string& workspace, const std::string& db_path) {
 
   // Pass 2: CALLS edges (caller function -> callee symbol).
   int calls = 0, skipped_ambiguous = 0, skipped_external = 0;
+  int imports = 0;
   for (const std::string& rel : rels) {
     const fs::path full = fs::path(workspace) / rel;
     const int li = lang_index(full);
@@ -197,6 +226,31 @@ int index_symbols(const std::string& workspace, const std::string& db_path) {
     TSQueryMatch m;
     while (ts_query_cursor_next_match(cursor, &m)) {
       if (m.pattern_index < 4) continue;
+      if (m.pattern_index >= 6) {
+        // IMPORTS: file -> file, resolved against the files table.
+        TSNode path = {0};
+        bool has_path = false;
+        for (uint32_t i = 0; i < m.capture_count; ++i) {
+          uint32_t len = 0;
+          const char* cap = ts_query_capture_name_for_id(queries[li], m.captures[i].index, &len);
+          if (std::string(cap, len) == "imp.path") { path = m.captures[i].node; has_path = true; }
+        }
+        if (ts_node_is_null(path) || !has_path) continue;
+        std::string spec = node_text(src, path);
+        if (spec.size() >= 2) spec = spec.substr(1, spec.size() - 2);  // strip quotes
+        const std::string tres = resolve_import(workspace, fileset, rel, spec);
+        if (tres.empty()) { ++skipped_external; continue; }
+        const std::string src_id =
+            rel + "::" + full.filename().string() + "::file";
+        const std::string dst_id =
+            tres + "::" + fs::path(tres).filename().string() + "::file";
+        if (run_stmt(db,
+              "INSERT OR REPLACE INTO edges(source_id,target_id,type)"
+              " VALUES(?1,?2,'IMPORTS');",
+              {src_id, dst_id}))
+          ++imports;
+        continue;
+      }
       TSNode node = {0}, name = {0};
       bool has_name = false;
       for (uint32_t i = 0; i < m.capture_count; ++i) {
@@ -241,6 +295,7 @@ int index_symbols(const std::string& workspace, const std::string& db_path) {
   ts_parser_delete(parser);
   sqlite3_close(db);
   std::cout << "calls: " << calls << " (ambiguous skipped: " << skipped_ambiguous
-            << ", external/dangling skipped: " << skipped_external << ")\n";
+            << ", external/dangling skipped: " << skipped_external << ")\n"
+            << "imports: " << imports << "\n";
   return symbols;
 }

@@ -26,4 +26,7 @@ CALLS resolution: same-file definition wins, else a unique repo-wide
 definition, else skipped as ambiguous; calls to unknown names are dropped
 (no dangling edges). Top-level calls have no function caller and are skipped.
 
-Next: `IMPORTS` (file->file) + `sample.db` from the contract mock graph.
+IMPORTS: relative paths resolved to `.ts`/`.tsx`/`index` files in the
+workspace; bare packages and missing targets are dropped.
+
+Next: `sample.db` from the contract mock graph.
