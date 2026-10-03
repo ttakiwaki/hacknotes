@@ -13,29 +13,23 @@
 5. **If unsure, ask one concise question** rather than guessing about anything that touches a contract.
 6. **Match the language/conventions of the person's piece** (see Section 7). Give complete, copy-pasteable code when asked for code.
 7. If this file conflicts with something said earlier in the chat by the user, the user's latest explicit statement wins; mention that this file may need updating.
-8. **Keep `README.md` up to date after every change.** The repo-root `README.md` is the team's one-page guide (what the project is, how to install and run each piece, env vars, ports, and current status). After **every** change you make or suggest that affects any of the following, include the corresponding `README.md` update in the same response (give the exact edited section or a ready-to-paste diff), so the README never drifts from the code:
-   - Setup or run commands (install steps, build steps, CLI usage such as `indexer <workspace_path> <db_path>`, how to start the server or UI)
-   - Dependencies, tool versions, or required local services (e.g. Ollama and the pulled model)
-   - Environment variables or `.env.example` entries (LLM/embedding provider, base URL, model, keys, ports)
-   - Contracts: SQLite schema, `search_symbols`, WebSocket messages, conventions (these must also be updated in `CONTRACTS.md`)
-   - Folder structure, file names, or ports/endpoints
-   - Feature status, known limitations, or demo steps
+8. **Log every change, big or small, in `CHANGES.md` (repo root).** Whenever your response creates, edits, deletes, renames, refactors, or fixes anything (code, config, docs, contracts, even a one-line typo or a variable rename), end the response with a **ready-to-paste `CHANGES.md` entry** in this format (one table row per change set):
 
-   If a change genuinely does not affect any of the above, say "README unaffected" in one short line. Never leave the README describing something that no longer exists. If you do not have the current README text, ask the user to paste it before editing it, rather than guessing its contents.
+   `| Date | Who / branch | Area | What changed | Why | Files touched | Contract impact |`
 
-9. **Log every change, big or small, in the Change Log (Section 14).** Whenever your response creates, edits, deletes, renames, refactors, or fixes anything (code, config, docs, contracts, even a one-line typo or a variable rename), end the response with a **ready-to-paste Change Log entry** in the format defined in Section 14. Rules:
-   - **One entry per change set**, written in the same response as the change, never "later".
-   - **Nothing is too small to log.** If in doubt, log it.
-   - **Append-only.** Add new entries at the bottom of the table; never rewrite, reorder, or delete old entries (if an earlier entry was wrong, add a new correcting entry).
-   - Every entry states its **README impact** (`updated` or `unaffected`) and **contract impact** (`none`, or which of SQLite schema / `search_symbols` / WebSocket / conventions changed, which also requires a `CONTRACTS.md` edit and a row in its change log).
-   - Pure questions, explanations, and brainstorming with no change to any file need no entry.
+   - `Area` is one of: `indexer`, `embeddings`, `server`, `ui`, `contracts`, `docs`, `config`, `other`.
+   - `Contract impact` is `none`, or names which contract changed (SQLite schema / `search_symbols` / WebSocket / conventions). A contract change also requires an edit to `CONTRACTS.md` and a row in its own change log.
+   - **One entry per change set**, written in the same response as the change, never "later". **Nothing is too small to log.** If in doubt, log it.
+   - **Append-only.** New entries go at the bottom of the table; never rewrite, reorder or delete old entries (if an earlier entry was wrong, add a new correcting entry).
+   - Pure questions, explanations and brainstorming with no change to any file need no entry.
    - Do not invent dates, branch names or author names: use what the user told you in this chat, or leave the field as `?` and ask.
+   - `CHANGES.md` is the only change log. `README.md` is a separate, hand-maintained run guide and is **not** part of this rule; do not say "README unaffected" or add README columns to log entries.
 
 ---
 
 ## 1. The project in one paragraph
 
-A **local-first codebase visualizer with an AI debugger**. You point it at a repo folder. It parses the code, builds a **graph of functions, classes and files** (who calls what, who imports what), shows it as an **interactive diagram** in a browser tab, and lets you ask questions like _"What breaks if I change DatabasePool?"_. The AI answers using the graph (structural neighbors) plus semantic code search (embeddings), and the **affected nodes light up in the UI** while the explanation streams into a chat panel.
+A **local-first codebase visualizer with an AI debugger**. You point it at a repo folder. It parses the code, builds a **graph of functions, classes and files** (who calls what, who imports what), shows it as an **interactive diagram** in a browser tab, and lets you ask questions like *"What breaks if I change DatabasePool?"*. The AI answers using the graph (structural neighbors) plus semantic code search (embeddings), and the **affected nodes light up in the UI** while the explanation streams into a chat panel.
 
 - **Event:** Hackathon starting **2026-10-03** (tomorrow relative to when this file was written, 2026-10-02). Hackathon name, duration, and judging criteria: **[OPEN — not provided]**.
 - **Form factor:** a **standalone local app** (local Python server + React app in a browser tab). It is **NOT a VS Code extension** (decided: extensions add packaging/webview headaches, and Ben is on Python so an extension host is not possible anyway).
@@ -47,15 +41,15 @@ A **local-first codebase visualizer with an AI debugger**. You point it at a rep
 
 Two planning documents existed. **The newer plan (this file) is authoritative.** The older plan is superseded; do not reintroduce its choices:
 
-| Topic           | Old plan (SUPERSEDED, ignore)                         | Current plan (USE THIS)                                           |
-| --------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
-| Form factor     | VS Code extension + webview                           | Standalone local app, browser tab                                 |
-| Indexer         | TypeScript with tree-sitter / web-tree-sitter in Node | **C++17 CLI binary** (Josh)                                       |
-| Graph traversal | Graphology (TypeScript)                               | **NetworkX** (Python, Ben)                                        |
-| Vector store    | LanceDB                                               | **SQLite `embeddings` table + numpy brute-force cosine** (Victor) |
-| Messaging       | `vscode.postMessage`                                  | **WebSocket** (Ben ↔ Cameron)                                     |
-| Server          | Extension host (Node)                                 | **FastAPI (Python)**                                              |
-| UI              | React + Vite + React Flow/Cytoscape                   | **React + Vite + React Flow** (Cytoscape only as fallback)        |
+| Topic | Old plan (SUPERSEDED, ignore) | Current plan (USE THIS) |
+|---|---|---|
+| Form factor | VS Code extension + webview | Standalone local app, browser tab |
+| Indexer | TypeScript with tree-sitter / web-tree-sitter in Node | **C++17 CLI binary** (Josh) |
+| Graph traversal | Graphology (TypeScript) | **NetworkX** (Python, Ben) |
+| Vector store | LanceDB | **SQLite `embeddings` table + numpy brute-force cosine** (Victor) |
+| Messaging | `vscode.postMessage` | **WebSocket** (Ben ↔ Cameron) |
+| Server | Extension host (Node) | **FastAPI (Python)** |
+| UI | React + Vite + React Flow/Cytoscape | **React + Vite + React Flow** (Cytoscape only as fallback) |
 
 ---
 
@@ -63,12 +57,14 @@ Two planning documents existed. **The newer plan (this file) is authoritative.**
 
 The pipeline is a chain. **Each person owns one transform and each output is the next person's input.**
 
-| Person      | Owns                                                                                  | Language   | Runs as                          |
-| ----------- | ------------------------------------------------------------------------------------- | ---------- | -------------------------------- |
-| **Josh**    | Parsing & indexing: repo folder → SQLite (files, nodes, edges)                        | C++17      | CLI binary                       |
-| **Victor**  | Embeddings & vector search: nodes → embeddings table + `search_symbols`               | Python     | Library imported by Ben's server |
-| **Ben**     | Retrieval, graph walk, LLM debugging agent, server, message routing (integration hub) | Python     | FastAPI server                   |
-| **Cameron** | Front-end: graph canvas, snippet drawer, chat panel                                   | TypeScript | React app in browser             |
+| Person | Owns | Language | Runs as |
+|---|---|---|---|
+| **Josh** | Parsing & indexing: repo folder → SQLite (files, nodes, edges) | C++17 | CLI binary |
+| **Victor** | Embeddings & vector search: nodes → embeddings table + `search_symbols` | Python | Library imported by Ben's server |
+| **Ben** | Retrieval, graph walk, LLM debugging agent, server, message routing (integration hub) | Python | FastAPI server |
+| **Cameron** | Front-end: graph canvas, snippet drawer, chat panel | TypeScript | React app in browser |
+
+Cameron's full name is Cameron Lau (the user is most likely him). Ben is the integration hub and should stay in close contact with all three others.
 
 ---
 
@@ -90,14 +86,12 @@ Repo folder
 ```
 
 **Only two real integration points exist:**
-
 1. A **SQLite file** (Josh → everyone).
 2. A **WebSocket** (Ben ↔ Cameron).
 
 Victor and Ben are both Python, so `search_symbols` is a **plain function call** (no network hop).
 
 ### End-to-end flow of a question
-
 1. UI connects to the server's WebSocket; server sends `graphData` (all nodes + edges).
 2. User types a question (optionally with a selected node) → UI sends `askAI {question, nodeId?}`.
 3. Ben resolves the target symbol: **exact SQLite match first**, Victor's `search_symbols` as **fallback**.
@@ -110,16 +104,15 @@ Victor and Ben are both Python, so `search_symbols` is a **plain function call**
 
 ## 5. Locked tech stack
 
-| Layer                   | Technology                                                                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Josh (indexer)**      | C++17, CMake with FetchContent, tree-sitter core + `tree-sitter-typescript` (provides both `typescript` and `tsx` grammars), SQLite amalgamation (C API), `picosha2` (SHA-256), `std::filesystem`, `.scm` Tree-sitter query files for symbol extraction |
-| **Victor (embeddings)** | Python, `sqlite3`, `numpy` (brute-force cosine similarity), embedding provider (see Section 6.2)                                                                                                                                                        |
-| **Ben (server)**        | Python, FastAPI + WebSockets, uvicorn, NetworkX, `sqlite3`, Pydantic (message models), LLM SDK with streaming (see Section 6.1)                                                                                                                         |
-| **Cameron (UI)**        | TypeScript, React, Vite, React Flow (`@xyflow/react`), `elkjs` (or `dagre`) for auto-layout, `zustand` (state), Tailwind CSS, Shiki (code highlighting)                                                                                                 |
-| **Shared**              | SQLite database file (WAL mode enabled), JSON over WebSocket, `.env` / `.env.example` for config                                                                                                                                                        |
+| Layer | Technology |
+|---|---|
+| **Josh (indexer)** | C++17, CMake with FetchContent, tree-sitter core + `tree-sitter-typescript` (provides both `typescript` and `tsx` grammars), SQLite amalgamation (C API), `picosha2` (SHA-256), `std::filesystem`, `.scm` Tree-sitter query files for symbol extraction |
+| **Victor (embeddings)** | Python, `sqlite3`, `numpy` (brute-force cosine similarity), embedding provider (see Section 6.2) |
+| **Ben (server)** | Python, FastAPI + WebSockets, uvicorn, NetworkX, `sqlite3`, Pydantic (message models), LLM SDK with streaming (see Section 6.1) |
+| **Cameron (UI)** | TypeScript, React, Vite, React Flow (`@xyflow/react`), `elkjs` (or `dagre`) for auto-layout, `zustand` (state), Tailwind CSS, Shiki (code highlighting) |
+| **Shared** | SQLite database file (WAL mode enabled), JSON over WebSocket, `.env` / `.env.example` for config |
 
 Notes:
-
 - **No vector database.** A hackathon repo has a few thousand symbols; brute-force cosine in numpy is instant.
 - **Switch to Cytoscape.js only if React Flow struggles** with the demo repo's size.
 - Enable **SQLite WAL mode** so Josh's binary and Victor/Ben's readers/writers do not lock each other.
@@ -135,14 +128,12 @@ Notes:
 ## 6. Provider decisions
 
 ### 6.1 LLM (Ben) — [OPEN, leaning OpenRouter free tier]
-
 - OpenRouter exposes an **OpenAI-compatible API**. Recommended approach: use the **`openai` Python SDK with a configurable `base_url`** (e.g. `https://openrouter.ai/api/v1`) and API key from env. That way switching to OpenAI, Anthropic's OpenAI-compatible endpoint, or any other provider is purely config.
 - Suggested env vars: `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`. Do **not** hardcode a model name in code.
 - **Risk:** free-tier models usually have **tight rate limits and variable availability/quality**. Mitigations: keep prompts compact (target code + 2-hop neighbors, truncated), cache the answer for the scripted demo questions, have a backup model/provider key ready, and rehearse the demo path before presenting. Verify current free-tier limits on the day.
 - Streaming is required (token-by-token over WebSocket).
 
 ### 6.2 Embeddings (Victor) — default decided
-
 - **Default: Ollama with `nomic-embed-text`** (local, free, no API key; fits the "local-first" goal). Nomic's model works best with task prefixes (`search_document: ` for symbol bodies, `search_query: ` for queries).
 - **Optional hosted mode:** Voyage `voyage-code-3` or OpenAI embeddings, selected by env var (`EMBEDDING_PROVIDER=ollama|voyage|openai`). Keep the provider behind one small function so swapping is trivial.
 - **Constraint:** the same model must be used for indexing and querying; if the provider or model changes, the embeddings table must be rebuilt.
@@ -153,7 +144,6 @@ Notes:
 ## 7. Per-person specs
 
 ### 7.1 Josh — Parsing & indexing (C++)
-
 - **Input:** workspace folder path. **Output:** populated SQLite DB (files, nodes, edges).
 - **CLI interface:** `indexer <workspace_path> <db_path>`
 - **Goals:**
@@ -161,14 +151,13 @@ Notes:
   2. SHA-256 hash every file; **only reparse new or changed files**.
   3. Run Tree-sitter queries to extract **functions, classes, imports and calls**.
   4. Write nodes and edges to SQLite; **delete a changed file's old rows before reinserting**.
-  5. _Stretch:_ a second language.
+  5. *Stretch:* a second language.
 - **Build order (suggested):** (1) get CMake building Tree-sitter + SQLite first, this is where time disappears; (2) write dummy rows so Ben can read something; (3) parse one file; (4) queries; (5) CALLS edges using **simple name matching**; (6) incremental hashing.
 - **IMPORTANT — stable node IDs:** IDs must be deterministic, e.g. `path::name::type`, **not auto-increment**. Otherwise Victor's embeddings are orphaned on every reindex.
 - **Demo-repo specifics (iseo-player is React/TSX):** use the **`tsx` grammar for `.tsx` files**. Many React components/hooks are `const Foo = () => {...}` arrow functions or function expressions assigned to variables, so the function queries must capture `variable_declarator` with `arrow_function`/`function_expression` values as `function` nodes, not only `function_declaration`.
 - **Deliverable early:** commit a **tiny sample DB** matching the schema as soon as possible, since everyone depends on it.
 
 ### 7.2 Victor — Embeddings & vector search (Python)
-
 - **Input:** `nodes` rows from SQLite plus source text sliced by `start_line` / `end_line`. **Output:** `embeddings` table and `search_symbols(query, k)`.
 - **Goals:**
   1. Slice each symbol's body using Josh's line ranges (**no fixed-size chunking**).
@@ -179,7 +168,6 @@ Notes:
 - Vector storage format **[PROPOSED]:** raw `float32` bytes (`numpy.ndarray.astype('float32').tobytes()`), same dimension for all rows.
 
 ### 7.3 Ben — Retrieval, LLM agent, server (Python)
-
 - **Input:** user question + optional selected `node_id`. **Output:** `impactedNodeIds[]` + streamed explanation.
 - **Goals:**
   1. Load SQLite edges into a **NetworkX** graph on startup.
@@ -189,10 +177,9 @@ Notes:
   5. Stream the LLM response **token by token** over the WebSocket.
   6. **Own the server and message routing** (hub for everyone).
   7. Also serve **graph JSON** and **code snippets** (read from the repo by line range) so Cameron's snippet drawer has content.
-- **Semantics note:** an edge `source → target` of type `CALLS` means _source calls target_. "What breaks if I change X?" = **dependents of X = nodes with edges pointing INTO X** (reverse traversal). Callees (outgoing edges) are useful context for the prompt but are not "impacted".
+- **Semantics note:** an edge `source → target` of type `CALLS` means *source calls target*. "What breaks if I change X?" = **dependents of X = nodes with edges pointing INTO X** (reverse traversal). Callees (outgoing edges) are useful context for the prompt but are not "impacted".
 
 ### 7.4 Cameron — Front-end (TypeScript + React)
-
 - **Input:** graph JSON, `impactedNodeIds[]`, streamed text tokens. **Output:** interactive graph UI + chat panel, plus user events sent back to the server.
 - **Goals:**
   1. **Graph canvas with auto-layout.** React Flow does **not** position nodes for you; use `elkjs` (or `dagre`). Plan for this early.
@@ -253,7 +240,6 @@ CREATE TABLE embeddings (
 ```python
 search_symbols(query: str, k: int) -> list[{"node_id": str, "score": float}]
 ```
-
 - Score = cosine similarity, **[PROPOSED]** range 0 to 1, sorted **highest first**.
 
 ### 8.3 WebSocket (Ben ↔ Cameron)
@@ -284,47 +270,32 @@ search_symbols(query: str, k: int) -> list[{"node_id": str, "score": float}]
   ]
 }
 ```
-
 ```json
 { "type": "highlightNodes", "ids": ["src/api/users.ts::getUser::function"] }
 ```
-
 ```json
 { "type": "chatToken", "text": "Changing the pool size affects" }
 ```
-
 ```json
 { "type": "chatDone" }
 ```
-
 ```json
-{
-  "type": "nodeSnippet",
-  "id": "src/db/pool.ts::DatabasePool::class",
-  "code": "export class DatabasePool { ... }"
-}
+{ "type": "nodeSnippet", "id": "src/db/pool.ts::DatabasePool::class", "code": "export class DatabasePool { ... }" }
 ```
 
 **Cameron → Ben**
 
 ```json
-{
-  "type": "askAI",
-  "question": "What breaks if I change DatabasePool?",
-  "nodeId": "src/db/pool.ts::DatabasePool::class"
-}
+{ "type": "askAI", "question": "What breaks if I change DatabasePool?", "nodeId": "src/db/pool.ts::DatabasePool::class" }
 ```
-
 ```json
 { "type": "nodeClicked", "id": "src/db/pool.ts::DatabasePool::class" }
 ```
-
 (`nodeId` in `askAI` is optional.)
 
 **Full message list:** `graphData`, `highlightNodes`, `chatToken`, `chatDone`, `nodeSnippet` (Ben → Cameron); `nodeClicked`, `askAI` (Cameron → Ben).
 
 **[PROPOSED] sequencing and behavior:**
-
 - `graphData` is sent once when the socket connects.
 - On `askAI`: Ben sends `highlightNodes` first (as soon as the impact set is known), then many `chatToken`, then `chatDone`.
 - On `nodeClicked`: Ben replies with `nodeSnippet` for that node (dependents highlighting is done client-side).
@@ -333,7 +304,6 @@ search_symbols(query: str, k: int) -> list[{"node_id": str, "score": float}]
 - **[PROPOSED] error shape**, so the UI can show failures instead of hanging: `{ "type": "error", "message": "human readable text", "code": "SYMBOL_NOT_FOUND | LLM_ERROR | INTERNAL" }`.
 
 ### 8.4 Conventions (the part people forget)
-
 - **Line numbers:** [PROPOSED] 1-indexed, inclusive start and end. (DB uses `start_line`/`end_line`; JSON on the wire uses `startLine`/`endLine`.)
 - **Paths:** relative to the workspace root, forward slashes, never absolute.
 - **Naming:** snake_case in Python/SQLite, camelCase on the wire. The one translation point is Ben's Pydantic models.
@@ -348,11 +318,11 @@ search_symbols(query: str, k: int) -> list[{"node_id": str, "score": float}]
 - **Final stretch:** Ben and Cameron integrate end-to-end; Josh and Victor fix bugs/performance; **rehearse the demo**.
 
 **Suggested repo layout [PROPOSED]:**
-
 ```
 repo-root/
 ├── CONTRACTS.md
-├── README.md            # one-page run commands for each piece; MUST be updated after every change (see Section 0, rule 8)
+├── README.md            # one-page run commands for each piece (hand-maintained)
+├── CHANGES.md           # append-only change log (see Section 0, rule 8)
 ├── .env.example         # shared config template
 ├── sample.db            # tiny committed DB matching the schema
 ├── indexer/             # Josh (C++/CMake)
@@ -364,14 +334,12 @@ repo-root/
 ---
 
 ## 10. Demo plan [PROPOSED]
-
-- Index `iseo-player`, open the UI, show the graph, click a node to show dependents + snippet drawer, ask _"What breaks if I change <some core hook/component>?"_, watch the nodes light up while the answer streams.
+- Index `iseo-player`, open the UI, show the graph, click a node to show dependents + snippet drawer, ask *"What breaks if I change <some core hook/component>?"*, watch the nodes light up while the answer streams.
 - Pre-test 2–3 questions that give good results with the real graph; pre-cache their answers as a fallback if the LLM API is slow or rate-limited.
 
 ---
 
 ## 11. Risks and fallbacks
-
 - **C++ build pain (Josh):** share a prebuilt binary or commit the generated `.db` for the demo repo. If the build fights back at the midpoint, a Python tree-sitter fallback is the escape hatch (this is the main condition under which the stack may change, and only by team decision).
 - **Call-edge accuracy:** simple name matching will create some wrong edges. Acceptable for a demo; choose questions/nodes where the result looks right.
 - **Three languages:** keep a shared `.env.example` and a one-page README with run commands for each piece so nobody loses time at integration.
@@ -392,7 +360,6 @@ repo-root/
 ---
 
 ## 13. Glossary
-
 - **Node:** a symbol in the graph (`function`, `class`, or `file`).
 - **Edge:** a relationship: `CALLS`, `IMPORTS`, `INHERITS_FROM`, `DEFINES`. Direction is `source → target` (source calls/imports/inherits/defines target).
 - **Impacted / dependent nodes:** nodes that would be affected if the target changes (reverse-direction traversal, depth 2).
@@ -401,21 +368,6 @@ repo-root/
 
 ---
 
-## 14. Change Log (append-only; see Section 0, rule 9)
+## 14. Change log
 
-**What to log:** every change to code, config, docs or contracts, big or small. **Where:** this table in `super.md`, which changes only through a PR to `main` (the webmaster merges and may batch entries from several people in one PR).
-
-**Entry format** (one row per change set, newest at the bottom):
-
-| Date       | Who / branch         | Area                                                                          | What changed               | Why              | Files touched          | README                | Contract                  |
-| ---------- | -------------------- | ----------------------------------------------------------------------------- | -------------------------- | ---------------- | ---------------------- | --------------------- | ------------------------- |
-| YYYY-MM-DD | name / `branch-name` | indexer \| embeddings \| server \| ui \| contracts \| docs \| config \| other | One or two plain sentences | Reason or ticket | `path/one`, `path/two` | updated \| unaffected | none \| which contract(s) |
-
-**History**
-
-| Date       | Who / branch | Area      | What changed                                                                                                                        | Why                                     | Files touched  | README     | Contract                               |
-| ---------- | ------------ | --------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------- | ---------- | -------------------------------------- |
-| 2026-10-02 | Cameron / ?  | docs      | Created `super.md` from the two planning docs; newer plan (C++ indexer, Python server, React UI, standalone app) made authoritative | Shared context file for AI chats        | `super.md`     | unaffected | none                                   |
-| 2026-10-03 | Cameron / ?  | docs      | Added rule 8 (keep `README.md` up to date after every change)                                                                       | Prevent README drifting from the code   | `super.md`     | unaffected | none                                   |
-| 2026-10-03 | Cameron / ?  | contracts | Created `CONTRACTS.md` v0.1 draft (SQLite schema, `search_symbols`, WebSocket protocol, types, mock data)                           | Lock boundaries between the four pieces | `CONTRACTS.md` | unaffected | all (initial draft, pending team lock) |
-| 2026-10-03 | Cameron / ?  | docs      | Added rule 9 and this Change Log section                                                                                            | Track every change, big or small        | `super.md`     | unaffected | none                                   |
+The change log lives in its own file, **`CHANGES.md`** at the repo root (see Section 0, rule 8). Like `super.md` and `CONTRACTS.md`, it changes only through a PR to `main`; the webmaster merges it and may batch entries from several people in one PR.

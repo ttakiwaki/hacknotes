@@ -7,7 +7,7 @@ This file defines **exactly what crosses each boundary** between our four pieces
 **Rules**
 1. If two people disagree on a shape, **this file decides**.
 2. **Never change a shape silently.** Edit this file, bump the version, add a row to the Change Log (Section 9), and tell everyone.
-3. After any change here, update `README.md` too (and `super.md` if the change affects the stack or ownership).
+3. After any change here, add a row to `CHANGES.md` (and update `super.md` if the change affects the stack or ownership).
 4. Items tagged **[CONFIRM]** are recommended defaults that the team must explicitly agree on when locking this file. Remove the tag once agreed.
 
 ---
