@@ -1,5 +1,6 @@
 import json
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
@@ -10,12 +11,23 @@ from contracts import (
     ChatToken,
     ErrorMessage,
     GraphData,
-    GraphEdge,
-    GraphNode,
     HighlightNodes,
     NodeClicked,
     NodeSnippet,
 )
+from graph_engine import GraphEngine
+from llm_agent import LLMAgent
+
+# Attempt importing Victor's search_symbols library
+try:
+    from embeddings import search_symbols
+except ImportError:
+    search_symbols = None
+
+load_dotenv()
+
+WORKSPACE_PATH = os.getenv("WORKSPACE_PATH", "./")
+DB_PATH = os.getenv("DB_PATH", "./index.db")
 
 app = FastAPI()
 
@@ -27,36 +39,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mock data matching CONTRACTS.md Section 7
-MOCK_NODES = [
-    GraphNode(id="src/db/pool.ts::pool.ts::file", type="file", name="pool.ts", path="src/db/pool.ts", start_line=1, end_line=90),
-    GraphNode(id="src/db/pool.ts::DatabasePool::class", type="class", name="DatabasePool", path="src/db/pool.ts", start_line=10, end_line=84),
-    GraphNode(id="src/api/users.ts::users.ts::file", type="file", name="users.ts", path="src/api/users.ts", start_line=1, end_line=40),
-    GraphNode(id="src/api/users.ts::getUser::function", type="function", name="getUser", path="src/api/users.ts", start_line=5, end_line=22),
-    GraphNode(id="src/api/users.ts::listUsers::function", type="function", name="listUsers", path="src/api/users.ts", start_line=24, end_line=38),
-    GraphNode(id="src/server.ts::server.ts::file", type="file", name="server.ts", path="src/server.ts", start_line=1, end_line=30),
-    GraphNode(id="src/server.ts::startServer::function", type="function", name="startServer", path="src/server.ts", start_line=8, end_line=28),
-]
+graph_engine = GraphEngine(db_path=DB_PATH, workspace_path=WORKSPACE_PATH)
+llm_agent = LLMAgent(graph_engine=graph_engine, search_symbols_fn=search_symbols)
 
-MOCK_EDGES = [
-    GraphEdge(source="src/db/pool.ts::pool.ts::file", target="src/db/pool.ts::DatabasePool::class", type="DEFINES"),
-    GraphEdge(source="src/api/users.ts::users.ts::file", target="src/api/users.ts::getUser::function", type="DEFINES"),
-    GraphEdge(source="src/api/users.ts::users.ts::file", target="src/api/users.ts::listUsers::function", type="DEFINES"),
-    GraphEdge(source="src/server.ts::server.ts::file", target="src/server.ts::startServer::function", type="DEFINES"),
-    GraphEdge(source="src/api/users.ts::users.ts::file", target="src/db/pool.ts::pool.ts::file", type="IMPORTS"),
-    GraphEdge(source="src/server.ts::server.ts::file", target="src/api/users.ts::users.ts::file", type="IMPORTS"),
-    GraphEdge(source="src/api/users.ts::getUser::function", target="src/db/pool.ts::DatabasePool::class", type="CALLS"),
-    GraphEdge(source="src/api/users.ts::listUsers::function", target="src/db/pool.ts::DatabasePool::class", type="CALLS"),
-    GraphEdge(source="src/server.ts::startServer::function", target="src/api/users.ts::getUser::function", type="CALLS"),
-]
+
+@app.on_event("startup")
+def startup_event():
+    graph_engine.load_from_db()
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
-    # Step 1: Send full graphData on connect
-    graph_msg = GraphData(nodes=MOCK_NODES, edges=MOCK_EDGES)
+    # Always reload graph on connect to catch DB updates
+    graph_engine.load_from_db()
+
+    # 1. Send full graphData on connect
+    graph_msg = GraphData(
+        nodes=list(graph_engine.nodes_dict.values()),
+        edges=graph_engine.edges_list,
+    )
     await websocket.send_text(graph_msg.model_dump_json(by_alias=True))
 
     try:
@@ -74,12 +77,13 @@ async def websocket_endpoint(websocket: WebSocket):
             if msg_type == "nodeClicked":
                 try:
                     msg = NodeClicked.model_validate(payload)
-                    # Mock snippet payload for testing
-                    snippet = NodeSnippet(
-                        id=msg.id,
-                        code=f"// Snippet for {msg.id}\nexport class Sample {{\n  // code goes here\n}}"
-                    )
-                    await websocket.send_text(snippet.model_dump_json(by_alias=True))
+                    snippet_code = graph_engine.get_snippet(msg.id)
+                    if snippet_code is None:
+                        err = ErrorMessage(code="SYMBOL_NOT_FOUND", message=f"Symbol '{msg.id}' not found.")
+                        await websocket.send_text(err.model_dump_json(by_alias=True))
+                    else:
+                        snippet_msg = NodeSnippet(id=msg.id, code=snippet_code)
+                        await websocket.send_text(snippet_msg.model_dump_json(by_alias=True))
                 except ValidationError as e:
                     err = ErrorMessage(code="BAD_REQUEST", message=str(e))
                     await websocket.send_text(err.model_dump_json(by_alias=True))
@@ -88,34 +92,39 @@ async def websocket_endpoint(websocket: WebSocket):
                 try:
                     msg = AskAI.model_validate(payload)
 
-                    # Mock depth-2 reverse traversal response for testing
-                    impacted_ids = [
-                        "src/api/users.ts::getUser::function",
-                        "src/api/users.ts::listUsers::function",
-                        "src/server.ts::startServer::function",
-                    ]
-                    
+                    # Target Resolution
+                    target_id = llm_agent.resolve_target(msg.question, msg.node_id)
+                    if not target_id:
+                        err = ErrorMessage(
+                            code="SYMBOL_NOT_FOUND",
+                            message=f"Could not resolve target symbol for question: '{msg.question}'"
+                        )
+                        await websocket.send_text(err.model_dump_json(by_alias=True))
+                        continue
+
+                    # Reverse Depth-2 BFS
+                    impacted_ids = graph_engine.get_impacted_nodes(target_id, max_depth=2)
+
+                    # Send highlightNodes first
                     highlight_msg = HighlightNodes(ids=impacted_ids)
                     await websocket.send_text(highlight_msg.model_dump_json(by_alias=True))
 
-                    # Stream sample tokens
-                    tokens = [
-                        "Changing ", "`DatabasePool` ", "affects ", "`getUser` ", 
-                        "and ", "`listUsers` ", "in `users.ts`.", " Consequently, ", 
-                        "`startServer` ", "is also impacted."
-                    ]
-                    for token in tokens:
-                        chat_token = ChatToken(text=token)
-                        await websocket.send_text(chat_token.model_dump_json(by_alias=True))
+                    # Stream LLM tokens
+                    try:
+                        async for token in llm_agent.stream_explanation(msg.question, target_id, impacted_ids):
+                            chat_token = ChatToken(text=token)
+                            await websocket.send_text(chat_token.model_dump_json(by_alias=True))
 
-                    await websocket.send_text(ChatDone().model_dump_json(by_alias=True))
+                        await websocket.send_text(ChatDone().model_dump_json(by_alias=True))
+                    except Exception as e:
+                        err = ErrorMessage(code="LLM_ERROR", message=f"LLM streaming failed: {str(e)}")
+                        await websocket.send_text(err.model_dump_json(by_alias=True))
 
                 except ValidationError as e:
                     err = ErrorMessage(code="BAD_REQUEST", message=str(e))
                     await websocket.send_text(err.model_dump_json(by_alias=True))
 
             else:
-                # Log and ignore unknown message types per CONTRACTS.md Section 3
                 print(f"Warning: Received unknown message type '{msg_type}'")
 
     except WebSocketDisconnect:
