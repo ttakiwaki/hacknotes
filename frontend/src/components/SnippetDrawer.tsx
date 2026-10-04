@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { codeToHtml } from 'shiki'
 import type { GraphNode } from '../types/contracts'
+import { useGraphStore } from '../store/useGraphStore'
+import type { ThemeName } from '../theme'
 
 interface SnippetDrawerProps {
   node?: GraphNode
@@ -17,24 +19,43 @@ function languageForPath(path: string): string {
   return 'text'
 }
 
+// Shiki themes bundled with the installed version (verified in
+// node_modules/@shikijs/themes). One per app theme so code matches the UI.
+function shikiTheme(theme: ThemeName): string {
+  switch (theme) {
+    case 'dark':
+      return 'github-dark'
+    case 'tokyo-night':
+      return 'tokyo-night'
+    case 'catppuccin':
+      return 'catppuccin-mocha'
+    case 'gruvbox':
+      return 'gruvbox-dark-medium'
+    default:
+      return 'github-light'
+  }
+}
+
 export function SnippetDrawer({ node, code }: SnippetDrawerProps) {
   const [highlightedCode, setHighlightedCode] = useState('')
+  const theme = useGraphStore((s) => s.theme)
 
   useEffect(() => {
     let cancelled = false
     if (!node || !code) {
       return
     }
+    setHighlightedCode('')
     void codeToHtml(code, {
       lang: languageForPath(node.path),
-      theme: 'github-dark',
+      theme: shikiTheme(theme),
     }).then((html) => {
       if (!cancelled) setHighlightedCode(html)
     })
     return () => {
       cancelled = true
     }
-  }, [code, node])
+  }, [code, node, theme])
 
   if (!node) {
     return (

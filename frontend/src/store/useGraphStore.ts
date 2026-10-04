@@ -4,6 +4,7 @@ import type {
   GraphEdge,
   GraphNode,
 } from '../types/contracts'
+import { loadTheme, type ThemeName } from '../theme'
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
 
@@ -22,6 +23,7 @@ interface GraphState {
   isStreaming: boolean
   connectionStatus: ConnectionStatus
   error?: { code: ErrorCode; message: string }
+  theme: ThemeName
   setGraph: (nodes: GraphNode[], edges: GraphEdge[]) => void
   selectNode: (id?: string) => void
   setImpactedNodeIds: (ids: string[]) => void
@@ -32,6 +34,7 @@ interface GraphState {
   finishAssistantMessage: () => void
   setConnectionStatus: (status: ConnectionStatus) => void
   setError: (error?: { code: ErrorCode; message: string }) => void
+  setTheme: (theme: ThemeName) => void
 }
 
 export const useGraphStore = create<GraphState>((set) => ({
@@ -42,6 +45,7 @@ export const useGraphStore = create<GraphState>((set) => ({
   chatMessages: [],
   isStreaming: false,
   connectionStatus: 'disconnected',
+  theme: loadTheme(),
   setGraph: (nodes, edges) => set({ nodes, edges }),
   selectNode: (selectedNodeId) => set({ selectedNodeId }),
   setImpactedNodeIds: (impactedNodeIds) => set({ impactedNodeIds }),
@@ -68,4 +72,12 @@ export const useGraphStore = create<GraphState>((set) => ({
   finishAssistantMessage: () => set({ isStreaming: false }),
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setError: (error) => set({ error, isStreaming: false }),
+  setTheme: (theme) => {
+    try {
+      localStorage.setItem('hacknotes-theme', theme)
+    } catch {
+      // ignore (private mode)
+    }
+    set({ theme })
+  },
 }))

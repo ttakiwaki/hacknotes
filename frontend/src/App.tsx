@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
 import "@xyflow/react/dist/style.css";
 import "./App.css";
 import { ChatPanel } from "./components/ChatPanel";
@@ -8,6 +8,7 @@ import { SnippetDrawer } from "./components/SnippetDrawer";
 import { mockEdges, mockNodes } from "./mocks/mockGraph";
 import { useGraphStore } from "./store/useGraphStore";
 import { GraphSocket } from "./ws/client";
+import { THEMES, THEME_LABELS, repoName } from "./theme";
 
 const mockSnippet = `export class DatabasePoolaaaaaaaaaaaaaaaaaa {
   constructor(private readonly size = 10) {}
@@ -36,6 +37,16 @@ const USE_MOCK = false;
 function App() {
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [hasStarted, setHasStarted] = useState(false);
+  const [showDefines, setShowDefines] = useState(false);
+  const [inspectorWidth, setInspectorWidth] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem("hacknotes-inspector-width"));
+      if (Number.isFinite(saved)) return Math.min(640, Math.max(280, saved));
+    } catch {
+      // ignore
+    }
+    return 400;
+  });
   const {
     nodes,
     edges,
@@ -46,6 +57,8 @@ function App() {
     connectionStatus,
     error,
     snippets,
+    theme,
+    setTheme,
     setGraph,
     selectNode,
     setImpactedNodeIds,
@@ -57,6 +70,11 @@ function App() {
 
   const socket = useMemo(() => new GraphSocket(), []);
   const useMock = USE_MOCK;
+  const repo = repoName(repositoryUrl);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedSnippet = selectedNodeId ? snippets[selectedNodeId] : undefined;
 
@@ -74,6 +92,25 @@ function App() {
     event.preventDefault();
     if (!repositoryUrl.trim()) return;
     setHasStarted(true);
+  };
+
+  const handleHome = () => {
+    selectNode(undefined);
+    setImpactedNodeIds([]);
+    setHasStarted(false);
+  };
+
+  const handleResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const workspace = (event.currentTarget as HTMLElement).parentElement;
+    if (!workspace) return;
+    const rect = workspace.getBoundingClientRect();
+    const next = Math.min(640, Math.max(280, rect.right - event.clientX));
+    setInspectorWidth(next);
+    try {
+      localStorage.setItem("hacknotes-inspector-width", String(Math.round(next)));
+    } catch {
+      // ignore
+    }
   };
 
   const handleNodeClick = (id: string) => {
@@ -151,14 +188,51 @@ function App() {
       {hasStarted && (
         <section
           className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}
+          style={
+            selectedNodeId
+              ? { gridTemplateColumns: `minmax(0, 1fr) 8px ${inspectorWidth}px` }
+              : undefined
+          }
         >
           <div className="graph-panel" id="graph">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">DEPENDENCY GRAPH</p>
+                <p className="eyebrow">{repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}</p>
                 <h2>{nodes.length} symbols indexed</h2>
               </div>
               <div className="graph-toolbar">
+                <button
+                  type="button"
+                  className="pill-toggle"
+                  onClick={handleHome}
+                  title="Back to the start screen"
+                >
+                  ⌂ home
+                </button>
+                <select
+                  className="pill-toggle theme-select"
+                  value={theme}
+                  onChange={(event) =>
+                    setTheme(event.target.value as (typeof THEMES)[number])
+                  }
+                  aria-label="Color theme"
+                  title="Color theme"
+                >
+                  {THEMES.map((t) => (
+                    <option key={t} value={t}>
+                      {THEME_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={`pill-toggle ${showDefines ? "pill-on" : ""}`}
+                  onClick={() => setShowDefines((v) => !v)}
+                  aria-pressed={showDefines}
+                  title="Show file-contains-symbol edges"
+                >
+                  defines
+                </button>
                 <span className={`status status-${connectionStatus}`}>
                   <span className="status-dot" />
                   {useMock ? "mock graph" : connectionStatus}
@@ -173,9 +247,23 @@ function App() {
               edges={edges}
               impactedNodeIds={impactedNodeIds}
               selectedNodeId={selectedNodeId}
+              showDefines={showDefines}
               onNodeClick={handleNodeClick}
             />
           </div>
+
+          {selectedNodeId && (
+            <div
+              className="resize-handle"
+              onPointerDown={(event) => {
+                (event.target as HTMLElement).setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                if (event.buttons === 1) handleResizeMove(event);
+              }}
+              title="Drag to resize the inspector"
+            />
+          )}
 
           {selectedNodeId && (
             <aside className="detail-panel" id="inspector">
