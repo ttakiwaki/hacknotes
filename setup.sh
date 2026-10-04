@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot dev setup for hacknotes. Idempotent: safe to re-run.
+# One-shot dev setup for Uxie. Idempotent: safe to re-run.
 # Installs nothing system-wide; everything lives in .venv/, frontend/node_modules/, indexer/build/.
 set -euo pipefail
 

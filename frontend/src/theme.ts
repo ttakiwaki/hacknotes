@@ -74,7 +74,7 @@ export const GRAPH_COLORS: Record<
   },
 }
 
-const THEME_KEY = 'hacknotes-theme'
+const THEME_KEY = 'uxie-theme'
 
 export function loadTheme(): ThemeName {
   try {
