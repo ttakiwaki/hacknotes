@@ -9,13 +9,29 @@ import { mockEdges, mockNodes } from "./mocks/mockGraph";
 import { useGraphStore } from "./store/useGraphStore";
 import { GraphSocket } from "./ws/client";
 
-const mockSnippet = `export class DatabasePool {
+const mockSnippet = `export class DatabasePoolaaaaaaaaaaaaaaaaaa {
   constructor(private readonly size = 10) {}
 
   async acquire() {
-    return this.connectionPool.acquire()
+    return this.connectionPool.acquireeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee()
   }
+  a
+  a
+  a
+  a
+  a
+  a
+  a
+  a
+  a
+  a
+  a
+  a
+  a
 }`;
+
+// Set to false to use the FastAPI/WebSocket backend.
+const USE_MOCK = false;
 
 function App() {
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -40,11 +56,8 @@ function App() {
   } = useGraphStore();
 
   const socket = useMemo(() => new GraphSocket(), []);
-  const useMock = import.meta.env.VITE_USE_MOCK === "true";
+  const useMock = USE_MOCK;
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
-  // const socket = useMemo(() => new GraphSocket(), []);
-  // const useMock = import.meta.env.VITE_USE_MOCK === "true";
-  // const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedSnippet = selectedNodeId ? snippets[selectedNodeId] : undefined;
 
   useEffect(() => {
@@ -130,63 +143,69 @@ function App() {
             />
             <button type="submit">Explore repository</button>
           </form>
-          <span className="landing-note">Local-first. No account required.</span>
+          <span className="landing-note">
+            Local-first. No account required.
+          </span>
         </section>
       )}
       {hasStarted && (
-      <section className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}>
-        <div className="graph-panel" id="graph">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">DEPENDENCY GRAPH</p>
-              <h2>{nodes.length} symbols indexed</h2>
+        <section
+          className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}
+        >
+          <div className="graph-panel" id="graph">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">DEPENDENCY GRAPH</p>
+                <h2>{nodes.length} symbols indexed</h2>
+              </div>
+              <div className="graph-toolbar">
+                <span className={`status status-${connectionStatus}`}>
+                  <span className="status-dot" />
+                  {useMock ? "mock graph" : connectionStatus}
+                </span>
+                {!selectedNodeId && (
+                  <span className="legend">click a node to inspect</span>
+                )}
+              </div>
             </div>
-            <div className="graph-toolbar">
-              <span className={`status status-${connectionStatus}`}>
-                <span className="status-dot" />
-                {useMock ? "mock graph" : connectionStatus}
-              </span>
-              {!selectedNodeId && (
-                <span className="legend">click a node to inspect</span>
-              )}
-            </div>
-          </div>
-          <GraphCanvas
-            nodes={nodes}
-            edges={edges}
-            impactedNodeIds={impactedNodeIds}
-            selectedNodeId={selectedNodeId}
-            onNodeClick={handleNodeClick}
-          />
-        </div>
-
-        {selectedNodeId && <aside className="detail-panel" id="inspector">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">INSPECTOR</p>
-              <h2>Selected symbol</h2>
-            </div>
-            <button
-              className="close-inspector"
-              type="button"
-              onClick={() => selectNode(undefined)}
-              aria-label="Close inspector"
-            >
-              ×
-            </button>
-          </div>
-          <SnippetDrawer node={selectedNode} code={selectedSnippet} />
-          <div id="debugger">
-            <ChatPanel
-              messages={chatMessages}
+            <GraphCanvas
               nodes={nodes}
-              isStreaming={isStreaming}
-              error={error?.message}
-              onAsk={handleAsk}
+              edges={edges}
+              impactedNodeIds={impactedNodeIds}
+              selectedNodeId={selectedNodeId}
+              onNodeClick={handleNodeClick}
             />
           </div>
-        </aside>}
-      </section>
+
+          {selectedNodeId && (
+            <aside className="detail-panel" id="inspector">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">INSPECTOR</p>
+                  <h2>Selected symbol</h2>
+                </div>
+                <button
+                  className="close-inspector"
+                  type="button"
+                  onClick={() => selectNode(undefined)}
+                  aria-label="Close inspector"
+                >
+                  ×
+                </button>
+              </div>
+              <SnippetDrawer node={selectedNode} code={selectedSnippet} />
+              <div id="debugger">
+                <ChatPanel
+                  messages={chatMessages}
+                  nodes={nodes}
+                  isStreaming={isStreaming}
+                  error={error?.message}
+                  onAsk={handleAsk}
+                />
+              </div>
+            </aside>
+          )}
+        </section>
       )}
     </main>
   );
