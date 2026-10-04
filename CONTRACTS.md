@@ -137,7 +137,7 @@ def search_symbols(query: str, k: int) -> list[dict]:
 - **Transport:** one JSON object per WebSocket text frame. Every message has a string **`type`** field.
 - **Naming on the wire [CONFIRM]:** **camelCase** for all JSON keys. Ben uses Pydantic aliases (e.g. `alias_generator=to_camel`, `populate_by_name=True`); Cameron uses matching TypeScript types.
 - **Unknown `type`:** receiver ignores it and logs a warning (never crashes).
-- **One conversation, one in-flight question [CONFIRM]:** the UI disables sending a new `askAI` until `chatDone` (or `error`) arrives, so no request IDs are needed in v0.1.
+- **One in-flight question [CONFIRM]:** the UI disables both ask inputs (inspector chat + prompt bar) until `chatDone` (or `error`) arrives, so no request IDs are needed in v0.1. Each input keeps its own thread; streamed tokens route to whichever thread asked.
 
 ### 3.1 Message list
 
@@ -248,6 +248,7 @@ def search_symbols(query: str, k: int) -> list[dict]:
 ```
 - `question`: required, non-empty string.
 - `nodeId`: **optional**. If present, it is the selected node and Ben uses it as the target directly. If absent, Ben resolves the target from the question text (exact SQLite match first, `search_symbols` as fallback).
+- **No resolvable target is not an error:** Ben falls back to general mode — top-k `search_symbols` context (or a project symbol map when search is unavailable), `highlightNodes` with the retrieved IDs (possibly empty), then a streamed general answer.
 
 **`nodeClicked`**
 ```json
