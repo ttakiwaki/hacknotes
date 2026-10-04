@@ -69,6 +69,11 @@ class ErrorMessage(WireModel):
 
 
 # --- Client -> Server Messages (Cameron -> Ben) ---
+class LoadRepository(WireModel):
+    type: Literal["loadRepository"]
+    repository_url: str
+
+
 class AskAI(WireModel):
     type: Literal["askAI"] = "askAI"
     question: str
@@ -84,4 +89,4 @@ class NodeClicked(WireModel):
 ServerMessage = Union[
     GraphData, HighlightNodes, ChatToken, ChatDone, NodeSnippet, ErrorMessage
 ]
-ClientMessage = Union[AskAI, NodeClicked]
+ClientMessage = Union[LoadRepository, AskAI, NodeClicked]
