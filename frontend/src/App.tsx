@@ -40,7 +40,7 @@ function App() {
   const [showDefines, setShowDefines] = useState(false);
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     try {
-      const saved = Number(localStorage.getItem("hacknotes-inspector-width"));
+      const saved = Number(localStorage.getItem("uxie-inspector-width"));
       if (Number.isFinite(saved)) return Math.min(640, Math.max(280, saved));
     } catch {
       // ignore
@@ -107,7 +107,7 @@ function App() {
     const next = Math.min(640, Math.max(280, rect.right - event.clientX));
     setInspectorWidth(next);
     try {
-      localStorage.setItem("hacknotes-inspector-width", String(Math.round(next)));
+      localStorage.setItem("uxie-inspector-width", String(Math.round(next)));
     } catch {
       // ignore
     }
@@ -164,7 +164,7 @@ function App() {
       {!hasStarted && (
         <section className="landing-page" aria-labelledby="landing-title">
           <div className="landing-mark">⌁</div>
-          <p className="eyebrow">HACKNOTES / CODEBASE MAP</p>
+          <p className="eyebrow">UXIE / CODEBASE MAP</p>
           <h1 id="landing-title">See how your code fits together.</h1>
           <p className="landing-description">
             Paste a GitHub repository and explore its dependencies, source, and

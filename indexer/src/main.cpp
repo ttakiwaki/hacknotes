@@ -37,7 +37,7 @@ static const char* err_tag() {
 static void banner(const Pal& p) {
   std::cout << p.cyan
             << "+-------------------------------+\n"
-            << "|  #  hacknotes / indexer       |\n"
+            << "|  #  uxie / indexer            |\n"
             << "+-------------------------------+\n"
             << p.off << p.dim << "  code-graph builder  v" << INDEXER_VERSION
             << "\n\n"
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
     }
     std::error_code ec;
     tempdir = (fs::temp_directory_path(ec) /
-               ("hacknotes-index-" + std::to_string(getpid())))
+               ("uxie-index-" + std::to_string(getpid())))
                   .string();
     if (ec) {
       std::cerr << err_tag() << " no temp dir\n";

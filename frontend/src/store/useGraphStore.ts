@@ -74,7 +74,7 @@ export const useGraphStore = create<GraphState>((set) => ({
   setError: (error) => set({ error, isStreaming: false }),
   setTheme: (theme) => {
     try {
-      localStorage.setItem('hacknotes-theme', theme)
+      localStorage.setItem('uxie-theme', theme)
     } catch {
       // ignore (private mode)
     }

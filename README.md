@@ -1,4 +1,4 @@
-# hacknotes
+# Uxie
 
 Local-first codebase visualizer with an AI debugger. Point it at a repo folder: Josh indexes it into SQLite, Victor embeds symbols, Ben serves graph + LLM over WebSocket, Cameron renders the UI.
 
