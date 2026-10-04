@@ -109,7 +109,36 @@ Full docs in `indexer/CHANGES.md`.
 
 ## Ben — server (`server/`)
 
-FastAPI on port 8000, WebSocket `ws://localhost:8000/ws` — not wired up yet.
+From the `server/` directory, set up and activate a Python virtual environment (`venv`):
+
+#### macOS / Linux:
+```bash
+cd server
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### Windows (Command Prompt):
+```cmd
+cd server
+python -m venv venv
+venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+#### Windows (PowerShell):
+```powershell
+cd server
+python -m venv venv
+venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### Run the server
+```
+npm run start-server
+```
 
 ## Cameron — UI (`ui/`)
 
