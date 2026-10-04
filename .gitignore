@@ -6,6 +6,7 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 index.db
+repos/
 embeddings/dev/
 node_modules
 package-lock.json
