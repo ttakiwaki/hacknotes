@@ -80,7 +80,8 @@ python -m unittest embeddings.test_embeddings
 
 ## Josh — indexer (`indexer/`)
 
-C++17 CLI. Walks a workspace (`.ts` / `.tsx` / `.js` / `.jsx` / `.py`),
+C++17 CLI. Walks a workspace (`.ts` / `.tsx` / `.js` / `.jsx` / `.py` /
+`.html` / `.css`),
 parses it with tree-sitter, and writes the `files` / `nodes` / `edges`
 contract tables (stable `path::name::type` ids, WAL, 1-indexed lines).
 CALLS by name matching (same-file wins, else unique repo-wide, else
