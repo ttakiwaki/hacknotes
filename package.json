@@ -6,7 +6,7 @@
     "build": "npm --prefix frontend run build",
     "lint": "npm --prefix frontend run lint",
     "preview": "npm --prefix frontend run preview",
-    "start-server": "uvicorn server.main:app --port 8000 --reload"
+    "start-server": "uvicorn server.main:app --port 8000"
   },
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.4",

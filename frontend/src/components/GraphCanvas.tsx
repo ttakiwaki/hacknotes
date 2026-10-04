@@ -51,12 +51,27 @@ function edgeStyle(type: string, theme: keyof typeof GRAPH_COLORS) {
   }
 }
 
+function minimapColor(theme: keyof typeof GRAPH_COLORS) {
+  const c = GRAPH_COLORS[theme];
+  return (node: Node) => {
+    const g = (node.data as CodeNodeData | undefined)?.graphNode;
+    if (g?.type === "file") {
+      const ext = (g.path.split(".").pop() ?? "").toLowerCase();
+      if (ext === "html") return c.fileHtml;
+      if (ext === "css") return c.fileCss;
+      return c.file;
+    }
+    if (g?.type === "class") return c.class;
+    return c.function;
+  };
+}
+
 const elk = new ELK();
 const nodeWidth = 190;
 const nodeHeight = 88;
 
 function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
-  const { graphNode, impacted, selected, dimmed } = data;
+  const { graphNode, impacted, selected } = data;
   const ext =
     graphNode.type === "file"
       ? (graphNode.path.split(".").pop() ?? "").toLowerCase()

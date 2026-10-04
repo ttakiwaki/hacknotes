@@ -236,19 +236,58 @@ function App() {
   return (
     <main className="app-shell">
       {!hasStarted && (
-        <section
-          className="landing-page"
-          aria-labelledby="landing-title"
-          onPointerMove={handleLandingPointerMove}
-          onPointerLeave={resetLandingPointer}
-        >
-          <div className="landing-graph-background" aria-hidden="true">
-            <GraphCanvas
-              nodes={mockNodes}
-              edges={mockEdges}
-              impactedNodeIds={[]}
-              showDefines
-              onNodeClick={() => undefined}
+        <section className="landing-page" aria-labelledby="landing-title">
+          <svg
+            className="landing-lockup"
+            viewBox="30 20 510 216"
+            role="img"
+            aria-label="Uxie logo"
+          >
+            <g
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="24"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path
+                d="M68 60 V146 A60 60 0 0 0 188 146 V60"
+                strokeWidth="26"
+              />
+              <circle cx="68" cy="60" r="22" fill="currentColor" stroke="none" />
+              <circle cx="188" cy="60" r="22" fill="currentColor" stroke="none" />
+              <g transform="translate(126,213)">
+                <path d="M132 -120 L204 -8" transform="translate(-10 0)" />
+                <path d="M204 -120 L132 -8" transform="translate(-10 0)" />
+                <path d="M252 -120 V-6" />
+                <path
+                  d="M373 -86 A44 44 0 1 0 373 -14"
+                  transform="translate(4 0)"
+                />
+                <path d="M318 -50 H386" transform="translate(4 0)" />
+                <circle
+                  cx="252"
+                  cy="-162"
+                  r="17"
+                  fill="currentColor"
+                  stroke="none"
+                />
+              </g>
+            </g>
+          </svg>
+          <p className="eyebrow">CODEBASE MAP</p>
+          <h1 id="landing-title">See how your code fits together.</h1>
+          <p className="landing-description">
+            Paste a GitHub repository and explore its dependencies, source, and
+            change impact in one place.
+          </p>
+          <form className="repository-form" onSubmit={handleRepositorySubmit}>
+            <input
+              value={repositoryUrl}
+              onChange={(event) => setRepositoryUrl(event.target.value)}
+              placeholder="https://github.com/owner/repository"
+              aria-label="GitHub repository URL"
+              autoFocus
             />
           </div>
           <div className="landing-content">
@@ -363,14 +402,8 @@ function App() {
                   <circle cx="188" cy="60" r="22" fill="currentColor" />
                 </svg>
                 <div>
-                  <p className="eyebrow">
-                    {repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}
-                  </p>
-                  <h2>
-                    {normalizedSearch
-                      ? `${visibleNodes.length} matching symbols`
-                      : `${nodes.length} symbols indexed`}
-                  </h2>
+                  <p className="eyebrow">{repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}</p>
+                  <h2>{nodes.length} symbols indexed</h2>
                 </div>
               </div>
               <div className="graph-toolbar">
