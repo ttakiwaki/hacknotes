@@ -28,7 +28,11 @@ export class GraphSocket {
     return true
   }
 
-  private open(repositoryUrl?: string) {
+  private open(
+    repositoryUrl?: string,
+    onReady?: () => void,
+    onError?: (message: string) => void,
+  ) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     const url = import.meta.env.VITE_WS_URL ?? `${proto}://${location.host}/ws`
     useGraphStore.getState().setConnectionStatus('connecting')

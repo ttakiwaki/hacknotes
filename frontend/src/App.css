@@ -316,8 +316,12 @@ body {
 }
 
 @keyframes loading-slide {
-  from { transform: translateX(-110%); }
-  to { transform: translateX(290%); }
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(290%);
+  }
 }
 
 .landing-error {
@@ -466,6 +470,7 @@ h2 {
   overscroll-behavior: none;
   background: var(--soft);
   animation: inspector-in 220ms ease-out;
+  z-index: 1000;
 }
 .resize-handle {
   position: relative;
@@ -517,12 +522,34 @@ h2 {
 .legend {
   padding-top: 4px;
 }
-.resize-handle:hover { border-left-color: var(--muted); box-shadow: inset 2px 0 0 var(--muted); }
-.resize-handle:hover::after { opacity: 1; }
-.panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
-.graph-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.graph-mark { width: 30px; height: 30px; flex: none; color: var(--ink); }
-.legend { padding-top: 4px; }
+.resize-handle:hover {
+  border-left-color: var(--muted);
+  box-shadow: inset 2px 0 0 var(--muted);
+}
+.resize-handle:hover::after {
+  opacity: 1;
+}
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+.graph-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.graph-mark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  color: var(--ink);
+}
+.legend {
+  padding-top: 4px;
+}
 
 .graph-canvas {
   height: auto;
@@ -678,24 +705,6 @@ h2 {
 .react-flow__edge:hover .react-flow__edge-path {
   stroke-width: 3.5;
 }
-  0%, 100% { outline-color: var(--orange); }
-  50% { outline-color: rgba(255, 145, 109, 0.25); }
-}
-.node-function { background: var(--node-function); }
-.node-class { background: var(--node-class); }
-.node-file { background: var(--node-file); }
-.node-file.node-ext-html { background: var(--node-file-html); }
-.node-file.node-ext-css { background: var(--node-file-css); }
-.node-type { color: var(--node-muted); }
-.flow-node strong { overflow: hidden; width: 100%; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
-.flow-node small { overflow: hidden; width: 100%; color: var(--node-muted); font: 11px ui-monospace, SFMono-Regular, monospace; text-overflow: ellipsis; white-space: nowrap; }
-.flow-handle { width: 7px; height: 7px; background: var(--node-line); border: 0; }
-
-.react-flow__controls { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; box-shadow: none; }
-.react-flow__controls-button { background: var(--paper); border-bottom: 1px solid var(--line); fill: var(--ink); }
-.react-flow__edge-text { fill: var(--muted); font: 9px ui-monospace, SFMono-Regular, monospace; }
-.react-flow__edge-textbg { fill: var(--paper); }
-.react-flow__edge:hover .react-flow__edge-path { stroke-width: 3.5; }
 .edge-tag {
   position: absolute;
   padding: 1px 6px;
