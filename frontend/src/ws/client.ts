@@ -7,10 +7,12 @@ export class GraphSocket {
   private socket?: WebSocket
   private reconnectTimer?: number
   private closedByUser = false
+  private graphDataCount = 0
 
-  connect(repositoryUrl?: string) {
+  connect(repositoryUrl?: string, onReady?: () => void, onError?: (message: string) => void) {
     this.closedByUser = false
-    this.open(repositoryUrl)
+    this.graphDataCount = 0
+    this.open(repositoryUrl, onReady, onError)
   }
 
   close() {
@@ -26,7 +28,11 @@ export class GraphSocket {
     return true
   }
 
-  private open(repositoryUrl?: string) {
+  private open(
+    repositoryUrl?: string,
+    onReady?: () => void,
+    onError?: (message: string) => void,
+  ) {
     const url = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws'
     useGraphStore.getState().setConnectionStatus('connecting')
     this.socket = new WebSocket(url)
@@ -38,13 +44,18 @@ export class GraphSocket {
       }
     })
     this.socket.addEventListener('message', (event) => {
-      this.handleMessage(JSON.parse(event.data) as ServerMessage)
+      this.handleMessage(
+        JSON.parse(event.data) as ServerMessage,
+        repositoryUrl,
+        onReady,
+        onError,
+      )
     })
     this.socket.addEventListener('close', () => {
       useGraphStore.getState().setConnectionStatus('disconnected')
       if (!this.closedByUser) {
         this.reconnectTimer = window.setTimeout(
-          () => this.open(repositoryUrl),
+          () => this.open(repositoryUrl, onReady, onError),
           reconnectDelayMs,
         )
       }
@@ -54,11 +65,18 @@ export class GraphSocket {
     })
   }
 
-  private handleMessage(message: ServerMessage) {
+  private handleMessage(
+    message: ServerMessage,
+    repositoryUrl?: string,
+    onReady?: () => void,
+    onError?: (message: string) => void,
+  ) {
     const store = useGraphStore.getState()
     switch (message.type) {
       case 'graphData':
         store.setGraph(message.nodes, message.edges)
+        this.graphDataCount += 1
+        if (this.graphDataCount >= (repositoryUrl ? 2 : 1)) onReady?.()
         break
       case 'highlightNodes':
         store.setImpactedNodeIds(message.ids)
@@ -74,6 +92,7 @@ export class GraphSocket {
         break
       case 'error':
         store.setError({ code: message.code, message: message.message })
+        onError?.(message.message)
         break
     }
   }

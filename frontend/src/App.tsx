@@ -37,7 +37,10 @@ const USE_MOCK = false;
 function App() {
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [hasStarted, setHasStarted] = useState(false);
+  const [isRepositoryLoading, setIsRepositoryLoading] = useState(false);
+  const [repositoryLoadError, setRepositoryLoadError] = useState("");
   const [showDefines, setShowDefines] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     try {
       const saved = Number(localStorage.getItem("uxie-inspector-width"));
@@ -77,6 +80,48 @@ function App() {
   }, [theme]);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedSnippet = selectedNodeId ? snippets[selectedNodeId] : undefined;
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const matchingNodeIds = new Set(
+    nodes
+      .filter(
+        (node) =>
+          node.name.toLowerCase().includes(normalizedSearch) ||
+          node.path.toLowerCase().includes(normalizedSearch),
+      )
+      .map((node) => node.id),
+  );
+  const visibleNodeIds = normalizedSearch
+    ? new Set(matchingNodeIds)
+    : new Set(nodes.map((node) => node.id));
+
+  if (normalizedSearch) {
+    const pending = [...matchingNodeIds];
+    while (pending.length > 0) {
+      const sourceId = pending.shift();
+      if (!sourceId) continue;
+      edges.forEach((edge) => {
+        if (edge.source === sourceId && !visibleNodeIds.has(edge.target)) {
+          visibleNodeIds.add(edge.target);
+          pending.push(edge.target);
+        }
+      });
+    }
+  }
+
+  const visibleNodes = nodes.filter((node) => visibleNodeIds.has(node.id));
+  const visibleEdges = normalizedSearch
+    ? edges.filter(
+        (edge) =>
+          visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
+      )
+    : edges;
+  const searchMatch = normalizedSearch
+    ? nodes.find(
+        (node) =>
+          node.name.toLowerCase().includes(normalizedSearch) ||
+          node.path.toLowerCase().includes(normalizedSearch),
+      )
+    : undefined;
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -84,20 +129,44 @@ function App() {
       setGraph(mockNodes, mockEdges);
       return;
     }
-    socket.connect(repositoryUrl.trim());
+    socket.connect(
+      repositoryUrl.trim(),
+      () => setIsRepositoryLoading(false),
+      (message) => {
+        setIsRepositoryLoading(false);
+        setRepositoryLoadError(message);
+      },
+    );
     return () => socket.close();
-  }, [hasStarted, setGraph, socket, useMock]);
+  }, [hasStarted, repositoryUrl, setGraph, socket, useMock]);
 
   const handleRepositorySubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!repositoryUrl.trim()) return;
+    setRepositoryLoadError("");
+    setIsRepositoryLoading(!useMock);
     setHasStarted(true);
   };
 
   const handleHome = () => {
     selectNode(undefined);
     setImpactedNodeIds([]);
+    setIsRepositoryLoading(false);
+    setRepositoryLoadError("");
     setHasStarted(false);
+  };
+
+  const handleLandingPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    event.currentTarget.style.setProperty("--landing-graph-x", `${x * -32}px`);
+    event.currentTarget.style.setProperty("--landing-graph-y", `${y * -32}px`);
+  };
+
+  const resetLandingPointer = (event: ReactPointerEvent<HTMLElement>) => {
+    event.currentTarget.style.setProperty("--landing-graph-x", "0px");
+    event.currentTarget.style.setProperty("--landing-graph-y", "0px");
   };
 
   const handleResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -134,6 +203,11 @@ function App() {
     setImpactedNodeIds([...dependents]);
     if (useMock) setSnippet(id, mockSnippet);
     else socket.send({ type: "nodeClicked", id });
+  };
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (searchMatch) handleNodeClick(searchMatch.id);
   };
 
   const handleAsk = (trimmedQuestion: string) => {
@@ -215,19 +289,96 @@ function App() {
               aria-label="GitHub repository URL"
               autoFocus
             />
-            <button type="submit">Explore repository</button>
-          </form>
-          <span className="landing-note">
-            Local-first. No account required.
-          </span>
+          </div>
+          <div className="landing-content">
+            <svg
+              className="landing-lockup"
+              viewBox="30 20 510 216"
+              role="img"
+              aria-label="Uxie logo"
+            >
+              <g
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path
+                  d="M68 60 V146 A60 60 0 0 0 188 146 V60"
+                  strokeWidth="26"
+                />
+                <circle
+                  cx="68"
+                  cy="60"
+                  r="22"
+                  fill="currentColor"
+                  stroke="none"
+                />
+                <circle
+                  cx="188"
+                  cy="60"
+                  r="22"
+                  fill="currentColor"
+                  stroke="none"
+                />
+                <g transform="translate(126,213)">
+                  <path d="M132 -120 L204 -8" transform="translate(-10 0)" />
+                  <path d="M204 -120 L132 -8" transform="translate(-10 0)" />
+                  <path d="M252 -120 V-6" />
+                  <path
+                    d="M373 -86 A44 44 0 1 0 373 -14"
+                    transform="translate(4 0)"
+                  />
+                  <path d="M318 -50 H386" transform="translate(4 0)" />
+                  <circle
+                    cx="252"
+                    cy="-162"
+                    r="17"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                </g>
+              </g>
+            </svg>
+            <h1 id="landing-title">See how your code fits together.</h1>
+            <form className="repository-form" onSubmit={handleRepositorySubmit}>
+              <input
+                value={repositoryUrl}
+                onChange={(event) => setRepositoryUrl(event.target.value)}
+                placeholder="https://github.com/owner/repository"
+                aria-label="GitHub repository URL"
+                autoFocus
+              />
+              <button type="submit">Explore repository</button>
+            </form>
+          </div>
         </section>
       )}
-      {hasStarted && (
+      {hasStarted && isRepositoryLoading && (
+        <section
+          className="repository-loading"
+          role="status"
+          aria-live="polite"
+        >
+          <h1>Preparing your codebase.</h1>
+          <div className="loading-track" aria-hidden="true">
+            <div className="loading-bar" />
+          </div>
+          <p>Cloning and indexing {repoName(repositoryUrl)}...</p>
+          {repositoryLoadError && (
+            <p className="landing-error">{repositoryLoadError}</p>
+          )}
+        </section>
+      )}
+      {hasStarted && !isRepositoryLoading && (
         <section
           className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}
           style={
             selectedNodeId
-              ? { gridTemplateColumns: `minmax(0, 1fr) 8px ${inspectorWidth}px` }
+              ? {
+                  gridTemplateColumns: `minmax(0, 1fr) 8px ${inspectorWidth}px`,
+                }
               : undefined
           }
         >
@@ -288,6 +439,25 @@ function App() {
                 >
                   defines
                 </button>
+                <form className="graph-search" onSubmit={handleSearchSubmit}>
+                  <span aria-hidden="true">⌕</span>
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search files or symbols"
+                    aria-label="Search files or symbols"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="clear-search"
+                      onClick={() => setSearchQuery("")}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </form>
                 <span className={`status status-${connectionStatus}`}>
                   <span className="status-dot" />
                   {useMock ? "mock graph" : connectionStatus}
@@ -298,8 +468,8 @@ function App() {
               </div>
             </div>
             <GraphCanvas
-              nodes={nodes}
-              edges={edges}
+              nodes={visibleNodes}
+              edges={visibleEdges}
               impactedNodeIds={impactedNodeIds}
               selectedNodeId={selectedNodeId}
               showDefines={showDefines}
@@ -311,7 +481,9 @@ function App() {
             <div
               className="resize-handle"
               onPointerDown={(event) => {
-                (event.target as HTMLElement).setPointerCapture(event.pointerId);
+                (event.target as HTMLElement).setPointerCapture(
+                  event.pointerId,
+                );
               }}
               onPointerMove={(event) => {
                 if (event.buttons === 1) handleResizeMove(event);
