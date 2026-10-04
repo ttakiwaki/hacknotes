@@ -551,6 +551,52 @@ h2 {
   padding-top: 4px;
 }
 
+/* Keep the panel header on one row when the inspector narrows the panel:
+   brand text truncates, the hint legend hides, and the toolbar scrolls
+   horizontally instead of wrapping onto extra rows. */
+.panel-heading {
+  flex-wrap: nowrap;
+}
+.graph-brand {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.graph-brand > div {
+  min-width: 0;
+  overflow: hidden;
+}
+.graph-brand h2,
+.graph-brand .eyebrow {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-toolbar {
+  flex: none;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.graph-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.graph-toolbar > * {
+  flex: none;
+}
+.pill-toggle,
+.status,
+.legend {
+  white-space: nowrap;
+}
+.workspace.has-inspector .legend {
+  display: none;
+}
+.workspace.has-inspector .graph-search {
+  width: 170px;
+  min-width: 110px;
+}
+
 .graph-canvas {
   height: auto;
   min-height: 0;

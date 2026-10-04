@@ -50,26 +50,26 @@ function App() {
     }
     return 400;
   });
-  const {
-    nodes,
-    edges,
-    selectedNodeId,
-    impactedNodeIds,
-    chatMessages,
-    isStreaming,
-    connectionStatus,
-    error,
-    snippets,
-    theme,
-    setTheme,
-    setGraph,
-    selectNode,
-    setImpactedNodeIds,
-    setSnippet,
-    addUserMessage,
-    startAssistantMessage,
-    appendAssistantToken,
-  } = useGraphStore();
+  // Per-field selectors: App must not re-render (and rebuild the graph)
+  // when unrelated store slices change, e.g. every AI chat token.
+  const nodes = useGraphStore((s) => s.nodes);
+  const edges = useGraphStore((s) => s.edges);
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const impactedNodeIds = useGraphStore((s) => s.impactedNodeIds);
+  const chatMessages = useGraphStore((s) => s.chatMessages);
+  const isStreaming = useGraphStore((s) => s.isStreaming);
+  const connectionStatus = useGraphStore((s) => s.connectionStatus);
+  const error = useGraphStore((s) => s.error);
+  const snippets = useGraphStore((s) => s.snippets);
+  const theme = useGraphStore((s) => s.theme);
+  const setTheme = useGraphStore((s) => s.setTheme);
+  const setGraph = useGraphStore((s) => s.setGraph);
+  const selectNode = useGraphStore((s) => s.selectNode);
+  const setImpactedNodeIds = useGraphStore((s) => s.setImpactedNodeIds);
+  const setSnippet = useGraphStore((s) => s.setSnippet);
+  const addUserMessage = useGraphStore((s) => s.addUserMessage);
+  const startAssistantMessage = useGraphStore((s) => s.startAssistantMessage);
+  const appendAssistantToken = useGraphStore((s) => s.appendAssistantToken);
 
   const socket = useMemo(() => new GraphSocket(), []);
   const useMock = USE_MOCK;
@@ -81,47 +81,52 @@ function App() {
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedSnippet = selectedNodeId ? snippets[selectedNodeId] : undefined;
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const matchingNodeIds = new Set(
-    nodes
-      .filter(
-        (node) =>
-          node.name.toLowerCase().includes(normalizedSearch) ||
-          node.path.toLowerCase().includes(normalizedSearch),
-      )
-      .map((node) => node.id),
-  );
-  const visibleNodeIds = normalizedSearch
-    ? new Set(matchingNodeIds)
-    : new Set(nodes.map((node) => node.id));
+  // Memoized: without this, every parent render (e.g. each chat token)
+  // rebuilds these arrays and React Flow reconciles the whole graph.
+  const { visibleNodes, visibleEdges, searchMatch } = useMemo(() => {
+    const matchingNodeIds = new Set(
+      nodes
+        .filter(
+          (node) =>
+            node.name.toLowerCase().includes(normalizedSearch) ||
+            node.path.toLowerCase().includes(normalizedSearch),
+        )
+        .map((node) => node.id),
+    );
+    const visibleNodeIds = normalizedSearch
+      ? new Set(matchingNodeIds)
+      : new Set(nodes.map((node) => node.id));
 
-  if (normalizedSearch) {
-    const pending = [...matchingNodeIds];
-    while (pending.length > 0) {
-      const sourceId = pending.shift();
-      if (!sourceId) continue;
-      edges.forEach((edge) => {
-        if (edge.source === sourceId && !visibleNodeIds.has(edge.target)) {
-          visibleNodeIds.add(edge.target);
-          pending.push(edge.target);
-        }
-      });
+    if (normalizedSearch) {
+      const pending = [...matchingNodeIds];
+      while (pending.length > 0) {
+        const sourceId = pending.shift();
+        if (!sourceId) continue;
+        edges.forEach((edge) => {
+          if (edge.source === sourceId && !visibleNodeIds.has(edge.target)) {
+            visibleNodeIds.add(edge.target);
+            pending.push(edge.target);
+          }
+        });
+      }
     }
-  }
 
-  const visibleNodes = nodes.filter((node) => visibleNodeIds.has(node.id));
-  const visibleEdges = normalizedSearch
-    ? edges.filter(
-        (edge) =>
-          visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
-      )
-    : edges;
-  const searchMatch = normalizedSearch
-    ? nodes.find(
-        (node) =>
-          node.name.toLowerCase().includes(normalizedSearch) ||
-          node.path.toLowerCase().includes(normalizedSearch),
-      )
-    : undefined;
+    const visibleNodes = nodes.filter((node) => visibleNodeIds.has(node.id));
+    const visibleEdges = normalizedSearch
+      ? edges.filter(
+          (edge) =>
+            visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
+        )
+      : edges;
+    const searchMatch = normalizedSearch
+      ? nodes.find(
+          (node) =>
+            node.name.toLowerCase().includes(normalizedSearch) ||
+            node.path.toLowerCase().includes(normalizedSearch),
+        )
+      : undefined;
+    return { visibleNodes, visibleEdges, searchMatch };
+  }, [nodes, edges, normalizedSearch]);
 
   useEffect(() => {
     if (!hasStarted) return;
