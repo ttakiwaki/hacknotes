@@ -3,7 +3,6 @@ import {
   BaseEdge,
   Controls,
   EdgeLabelRenderer,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   Handle,
@@ -25,6 +24,7 @@ interface CodeNodeData extends Record<string, unknown> {
   graphNode: GraphNode;
   impacted: boolean;
   selected: boolean;
+  dimmed: boolean;
 }
 
 interface GraphCanvasProps {
@@ -39,8 +39,6 @@ interface GraphCanvasProps {
 // Edge look per relationship type. DEFINES (file contains symbol) is
 // structural and numerous, so it stays thin, dashed, and label-free;
 // CALLS/IMPORTS carry the signal and get color + labels.
-// Strokes come from the active theme (GRAPH_COLORS), so they are passed
-// as inline styles referencing the same palette as the MiniMap.
 function edgeStyle(type: string, theme: keyof typeof GRAPH_COLORS) {
   const c = GRAPH_COLORS[theme];
   switch (type) {
@@ -53,27 +51,12 @@ function edgeStyle(type: string, theme: keyof typeof GRAPH_COLORS) {
   }
 }
 
-function minimapColor(theme: keyof typeof GRAPH_COLORS) {
-  const c = GRAPH_COLORS[theme];
-  return (node: Node) => {
-    const g = (node.data as CodeNodeData | undefined)?.graphNode;
-    if (g?.type === "file") {
-      const ext = (g.path.split(".").pop() ?? "").toLowerCase();
-      if (ext === "html") return c.fileHtml;
-      if (ext === "css") return c.fileCss;
-      return c.file;
-    }
-    if (g?.type === "class") return c.class;
-    return c.function;
-  };
-}
-
 const elk = new ELK();
 const nodeWidth = 190;
 const nodeHeight = 88;
 
 function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
-  const { graphNode, impacted, selected } = data;
+  const { graphNode, impacted, selected, dimmed } = data;
   const ext =
     graphNode.type === "file"
       ? (graphNode.path.split(".").pop() ?? "").toLowerCase()
@@ -84,7 +67,9 @@ function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
     <div
       className={`flow-node node-${graphNode.type}${extClass} ${
         impacted ? "flow-node-impacted" : ""
-      } ${selected ? "flow-node-selected" : ""}`}
+      } ${selected ? "flow-node-selected" : ""} ${
+        dimmed ? "flow-node-dimmed" : ""
+      }`}
     >
       <Handle className="flow-handle" position={Position.Left} type="target" />
       <span className="node-type">{graphNode.type}</span>
@@ -283,8 +268,8 @@ function GraphCanvasInner({
 }: GraphCanvasProps) {
   const [layoutedNodes, setLayoutedNodes] = useState<Node<CodeNodeData>[]>([]);
   const glide = useGlide();
+  const { setCenter } = useReactFlow();
   const theme = useGraphStore((s) => s.theme);
-  const mapColor = useMemo(() => minimapColor(theme), [theme]);
   // Layout always sees the full edge set so toggling DEFINES on/off
   // doesn't reshuffle node positions; only rendering is filtered.
   const layoutEdges = useMemo<Edge[]>(
@@ -307,12 +292,30 @@ function GraphCanvasInner({
           type: "curvy",
           animated: edge.type === "CALLS",
           label: edge.type === "DEFINES" ? undefined : edge.type,
-          style: edgeStyle(edge.type, theme),
+          style: {
+            ...edgeStyle(edge.type, theme),
+            opacity:
+              selectedNodeId &&
+              edge.source !== selectedNodeId &&
+              edge.target !== selectedNodeId
+                ? 0.18
+                : 1,
+          },
           data: { bend: ((index % 5) - 2) * 0.22 },
           className: `flow-edge edge-${edge.type.toLowerCase()}`,
         })),
-    [edges, showDefines, theme],
+    [edges, selectedNodeId, showDefines, theme],
   );
+
+  const connectedNodeIds = useMemo(() => {
+    if (!selectedNodeId) return new Set<string>();
+    const ids = new Set([selectedNodeId]);
+    edges.forEach((edge) => {
+      if (edge.source === selectedNodeId) ids.add(edge.target);
+      if (edge.target === selectedNodeId) ids.add(edge.source);
+    });
+    return ids;
+  }, [edges, selectedNodeId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -320,14 +323,15 @@ function GraphCanvasInner({
       id: graphNode.id,
       type: "code",
       position: { x: 0, y: 0 },
-      // Explicit dimensions (match .flow-node CSS): ELK lays out with
-      // these, and MiniMap needs them to draw visible node rects.
+      // Explicit dimensions match the rendered node dimensions.
       width: nodeWidth,
       height: nodeHeight,
       data: {
         graphNode,
         impacted: impactedNodeIds.includes(graphNode.id),
         selected: selectedNodeId === graphNode.id,
+        dimmed:
+          selectedNodeId !== undefined && !connectedNodeIds.has(graphNode.id),
       },
     }));
 
@@ -337,7 +341,35 @@ function GraphCanvasInner({
     return () => {
       cancelled = true;
     };
-  }, [layoutEdges, impactedNodeIds, nodes, selectedNodeId]);
+  }, [
+    connectedNodeIds,
+    layoutEdges,
+    impactedNodeIds,
+    nodes,
+    selectedNodeId,
+  ]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    const node = layoutedNodes.find((item) => item.id === selectedNodeId);
+    if (!node) return;
+    const width = node.measured?.width ?? node.width ?? nodeWidth;
+    const height = node.measured?.height ?? node.height ?? nodeHeight;
+    void setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom: 1.1,
+      duration: 500,
+    });
+  }, [layoutedNodes, selectedNodeId, setCenter]);
+
+  const focusNode = (node: Node<CodeNodeData>) => {
+    const width = node.measured?.width ?? node.width ?? nodeWidth;
+    const height = node.measured?.height ?? node.height ?? nodeHeight;
+    void setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom: 1.1,
+      duration: 500,
+    });
+    onNodeClick(node.id);
+  };
 
   return (
     <div className="graph-canvas">
@@ -349,14 +381,13 @@ function GraphCanvasInner({
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.25}
-        onNodeClick={(_, node) => onNodeClick(node.id)}
+        onNodeClick={(_, node) => focusNode(node)}
         onMoveStart={glide.onMoveStart}
         onMove={glide.onMove}
         onMoveEnd={glide.onMoveEnd}
         proOptions={{ hideAttribution: true }}
       >
         <Controls showInteractive={false} position="bottom-right" />
-        <MiniMap pannable zoomable nodeColor={mapColor} position="bottom-left" />
       </ReactFlow>
     </div>
   );

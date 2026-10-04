@@ -32,11 +32,13 @@ const mockSnippet = `export class DatabasePoolaaaaaaaaaaaaaaaaaa {
 }`;
 
 // Set to false to use the FastAPI/WebSocket backend.
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 function App() {
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [hasStarted, setHasStarted] = useState(false);
+  const [isRepositoryLoading, setIsRepositoryLoading] = useState(false);
+  const [repositoryLoadError, setRepositoryLoadError] = useState("");
   const [showDefines, setShowDefines] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [inspectorWidth, setInspectorWidth] = useState(() => {
@@ -113,6 +115,13 @@ function App() {
           visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
       )
     : edges;
+  const searchMatch = normalizedSearch
+    ? nodes.find(
+        (node) =>
+          node.name.toLowerCase().includes(normalizedSearch) ||
+          node.path.toLowerCase().includes(normalizedSearch),
+      )
+    : undefined;
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -120,20 +129,44 @@ function App() {
       setGraph(mockNodes, mockEdges);
       return;
     }
-    socket.connect(repositoryUrl.trim());
+    socket.connect(
+      repositoryUrl.trim(),
+      () => setIsRepositoryLoading(false),
+      (message) => {
+        setIsRepositoryLoading(false);
+        setRepositoryLoadError(message);
+      },
+    );
     return () => socket.close();
-  }, [hasStarted, setGraph, socket, useMock]);
+  }, [hasStarted, repositoryUrl, setGraph, socket, useMock]);
 
   const handleRepositorySubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!repositoryUrl.trim()) return;
+    setRepositoryLoadError("");
+    setIsRepositoryLoading(!useMock);
     setHasStarted(true);
   };
 
   const handleHome = () => {
     selectNode(undefined);
     setImpactedNodeIds([]);
+    setIsRepositoryLoading(false);
+    setRepositoryLoadError("");
     setHasStarted(false);
+  };
+
+  const handleLandingPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    event.currentTarget.style.setProperty("--landing-graph-x", `${x * -32}px`);
+    event.currentTarget.style.setProperty("--landing-graph-y", `${y * -32}px`);
+  };
+
+  const resetLandingPointer = (event: ReactPointerEvent<HTMLElement>) => {
+    event.currentTarget.style.setProperty("--landing-graph-x", "0px");
+    event.currentTarget.style.setProperty("--landing-graph-y", "0px");
   };
 
   const handleResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -172,6 +205,11 @@ function App() {
     else socket.send({ type: "nodeClicked", id });
   };
 
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (searchMatch) handleNodeClick(searchMatch.id);
+  };
+
   const handleAsk = (trimmedQuestion: string) => {
     if (!trimmedQuestion || isStreaming) return;
     addUserMessage(trimmedQuestion);
@@ -198,67 +236,103 @@ function App() {
   return (
     <main className="app-shell">
       {!hasStarted && (
-        <section className="landing-page" aria-labelledby="landing-title">
-          <svg
-            className="landing-lockup"
-            viewBox="30 20 510 216"
-            role="img"
-            aria-label="Uxie logo"
-          >
-            <g
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <section
+          className="landing-page"
+          aria-labelledby="landing-title"
+          onPointerMove={handleLandingPointerMove}
+          onPointerLeave={resetLandingPointer}
+        >
+          <div className="landing-graph-background" aria-hidden="true">
+            <GraphCanvas
+              nodes={mockNodes}
+              edges={mockEdges}
+              impactedNodeIds={[]}
+              showDefines
+              onNodeClick={() => undefined}
+            />
+          </div>
+          <div className="landing-content">
+            <svg
+              className="landing-lockup"
+              viewBox="30 20 510 216"
+              role="img"
+              aria-label="Uxie logo"
             >
-              <path
-                d="M68 60 V146 A60 60 0 0 0 188 146 V60"
-                strokeWidth="26"
-              />
-              <circle cx="68" cy="60" r="22" fill="currentColor" stroke="none" />
-              <circle cx="188" cy="60" r="22" fill="currentColor" stroke="none" />
-              <g transform="translate(126,213)">
-                <path d="M132 -120 L204 -8" transform="translate(-10 0)" />
-                <path d="M204 -120 L132 -8" transform="translate(-10 0)" />
-                <path d="M252 -120 V-6" />
+              <g
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path
-                  d="M373 -86 A44 44 0 1 0 373 -14"
-                  transform="translate(4 0)"
+                  d="M68 60 V146 A60 60 0 0 0 188 146 V60"
+                  strokeWidth="26"
                 />
-                <path d="M318 -50 H386" transform="translate(4 0)" />
                 <circle
-                  cx="252"
-                  cy="-162"
-                  r="17"
+                  cx="68"
+                  cy="60"
+                  r="22"
                   fill="currentColor"
                   stroke="none"
                 />
+                <circle
+                  cx="188"
+                  cy="60"
+                  r="22"
+                  fill="currentColor"
+                  stroke="none"
+                />
+                <g transform="translate(126,213)">
+                  <path d="M132 -120 L204 -8" transform="translate(-10 0)" />
+                  <path d="M204 -120 L132 -8" transform="translate(-10 0)" />
+                  <path d="M252 -120 V-6" />
+                  <path
+                    d="M373 -86 A44 44 0 1 0 373 -14"
+                    transform="translate(4 0)"
+                  />
+                  <path d="M318 -50 H386" transform="translate(4 0)" />
+                  <circle
+                    cx="252"
+                    cy="-162"
+                    r="17"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                </g>
               </g>
-            </g>
-          </svg>
-          <p className="eyebrow">CODEBASE MAP</p>
-          <h1 id="landing-title">See how your code fits together.</h1>
-          <p className="landing-description">
-            Paste a GitHub repository and explore its dependencies, source, and
-            change impact in one place.
-          </p>
-          <form className="repository-form" onSubmit={handleRepositorySubmit}>
-            <input
-              value={repositoryUrl}
-              onChange={(event) => setRepositoryUrl(event.target.value)}
-              placeholder="https://github.com/owner/repository"
-              aria-label="GitHub repository URL"
-              autoFocus
-            />
-            <button type="submit">Explore repository</button>
-          </form>
-          <span className="landing-note">
-            Local-first. No account required.
-          </span>
+            </svg>
+            <h1 id="landing-title">See how your code fits together.</h1>
+            <form className="repository-form" onSubmit={handleRepositorySubmit}>
+              <input
+                value={repositoryUrl}
+                onChange={(event) => setRepositoryUrl(event.target.value)}
+                placeholder="https://github.com/owner/repository"
+                aria-label="GitHub repository URL"
+                autoFocus
+              />
+              <button type="submit">Explore repository</button>
+            </form>
+          </div>
         </section>
       )}
-      {hasStarted && (
+      {hasStarted && isRepositoryLoading && (
+        <section
+          className="repository-loading"
+          role="status"
+          aria-live="polite"
+        >
+          <h1>Preparing your codebase.</h1>
+          <div className="loading-track" aria-hidden="true">
+            <div className="loading-bar" />
+          </div>
+          <p>Cloning and indexing {repoName(repositoryUrl)}...</p>
+          {repositoryLoadError && (
+            <p className="landing-error">{repositoryLoadError}</p>
+          )}
+        </section>
+      )}
+      {hasStarted && !isRepositoryLoading && (
         <section
           className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}
           style={
@@ -271,17 +345,6 @@ function App() {
         >
           <div className="graph-panel" id="graph">
             <div className="panel-heading">
-<<<<<<< HEAD
-              <div>
-                <p className="eyebrow">
-                  {repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}
-                </p>
-                <h2>
-                  {normalizedSearch
-                    ? `${visibleNodes.length} matching symbols`
-                    : `${nodes.length} symbols indexed`}
-                </h2>
-=======
               <div className="graph-brand">
                 <svg
                   className="graph-mark"
@@ -300,10 +363,15 @@ function App() {
                   <circle cx="188" cy="60" r="22" fill="currentColor" />
                 </svg>
                 <div>
-                  <p className="eyebrow">{repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}</p>
-                  <h2>{nodes.length} symbols indexed</h2>
+                  <p className="eyebrow">
+                    {repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}
+                  </p>
+                  <h2>
+                    {normalizedSearch
+                      ? `${visibleNodes.length} matching symbols`
+                      : `${nodes.length} symbols indexed`}
+                  </h2>
                 </div>
->>>>>>> a3a2098 (brand: Uxie lockup on landing, mark in graph header, favicon)
               </div>
               <div className="graph-toolbar">
                 <button
@@ -338,7 +406,7 @@ function App() {
                 >
                   defines
                 </button>
-                <label className="graph-search">
+                <form className="graph-search" onSubmit={handleSearchSubmit}>
                   <span aria-hidden="true">⌕</span>
                   <input
                     value={searchQuery}
@@ -356,7 +424,7 @@ function App() {
                       ×
                     </button>
                   )}
-                </label>
+                </form>
                 <span className={`status status-${connectionStatus}`}>
                   <span className="status-dot" />
                   {useMock ? "mock graph" : connectionStatus}
