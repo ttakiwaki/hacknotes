@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import "@xyflow/react/dist/style.css";
 import "./App.css";
 import { ChatPanel } from "./components/ChatPanel";
@@ -17,6 +18,8 @@ const mockSnippet = `export class DatabasePool {
 }`;
 
 function App() {
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [hasStarted, setHasStarted] = useState(false);
   const {
     nodes,
     edges,
@@ -36,22 +39,29 @@ function App() {
     appendAssistantToken,
   } = useGraphStore();
 
-  // const socket = useMemo(() => new GraphSocket(), [])
-  // const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
-  // const selectedNode = nodes.find((node) => node.id === selectedNodeId)
   const socket = useMemo(() => new GraphSocket(), []);
   const useMock = import.meta.env.VITE_USE_MOCK === "true";
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+  // const socket = useMemo(() => new GraphSocket(), []);
+  // const useMock = import.meta.env.VITE_USE_MOCK === "true";
+  // const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedSnippet = selectedNodeId ? snippets[selectedNodeId] : undefined;
 
   useEffect(() => {
+    if (!hasStarted) return;
     if (useMock) {
       setGraph(mockNodes, mockEdges);
       return;
     }
-    socket.connect();
+    socket.connect(repositoryUrl.trim());
     return () => socket.close();
-  }, [setGraph, socket, useMock]);
+  }, [hasStarted, setGraph, socket, useMock]);
+
+  const handleRepositorySubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!repositoryUrl.trim()) return;
+    setHasStarted(true);
+  };
 
   const handleNodeClick = (id: string) => {
     selectNode(id);
@@ -101,25 +111,45 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="app-header">
-        <div>
+      {!hasStarted && (
+        <section className="landing-page" aria-labelledby="landing-title">
+          <div className="landing-mark">⌁</div>
           <p className="eyebrow">HACKNOTES / CODEBASE MAP</p>
-          <h1>Understand the blast radius.</h1>
-        </div>
-        <span className={`status status-${connectionStatus}`}>
-          <span className="status-dot" />
-          {useMock ? "mock graph" : connectionStatus}
-        </span>
-      </header>
-
-      <section className="workspace">
-        <div className="graph-panel">
+          <h1 id="landing-title">See how your code fits together.</h1>
+          <p className="landing-description">
+            Paste a GitHub repository and explore its dependencies, source, and
+            change impact in one place.
+          </p>
+          <form className="repository-form" onSubmit={handleRepositorySubmit}>
+            <input
+              value={repositoryUrl}
+              onChange={(event) => setRepositoryUrl(event.target.value)}
+              placeholder="https://github.com/owner/repository"
+              aria-label="GitHub repository URL"
+              autoFocus
+            />
+            <button type="submit">Explore repository</button>
+          </form>
+          <span className="landing-note">Local-first. No account required.</span>
+        </section>
+      )}
+      {hasStarted && (
+      <section className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}>
+        <div className="graph-panel" id="graph">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">DEPENDENCY GRAPH</p>
               <h2>{nodes.length} symbols indexed</h2>
             </div>
-            <span className="legend">click a node to inspect</span>
+            <div className="graph-toolbar">
+              <span className={`status status-${connectionStatus}`}>
+                <span className="status-dot" />
+                {useMock ? "mock graph" : connectionStatus}
+              </span>
+              {!selectedNodeId && (
+                <span className="legend">click a node to inspect</span>
+              )}
+            </div>
           </div>
           <GraphCanvas
             nodes={nodes}
@@ -130,23 +160,34 @@ function App() {
           />
         </div>
 
-        <aside className="detail-panel">
+        {selectedNodeId && <aside className="detail-panel" id="inspector">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">INSPECTOR</p>
-              <h2>{selectedNodeId ? "Selected symbol" : "Select a symbol"}</h2>
+              <h2>Selected symbol</h2>
             </div>
+            <button
+              className="close-inspector"
+              type="button"
+              onClick={() => selectNode(undefined)}
+              aria-label="Close inspector"
+            >
+              ×
+            </button>
           </div>
           <SnippetDrawer node={selectedNode} code={selectedSnippet} />
-          <ChatPanel
-            messages={chatMessages}
-            nodes={nodes}
-            isStreaming={isStreaming}
-            error={error?.message}
-            onAsk={handleAsk}
-          />
-        </aside>
+          <div id="debugger">
+            <ChatPanel
+              messages={chatMessages}
+              nodes={nodes}
+              isStreaming={isStreaming}
+              error={error?.message}
+              onAsk={handleAsk}
+            />
+          </div>
+        </aside>}
       </section>
+      )}
     </main>
   );
 }

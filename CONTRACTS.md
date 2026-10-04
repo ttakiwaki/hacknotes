@@ -1,6 +1,6 @@
 # CONTRACTS.md
 
-**Version:** v0.1 (draft — to be locked by all four teammates in the first 30 minutes of the hackathon)
+**Version:** v0.2 (draft — repository loading message added)
 
 This file defines **exactly what crosses each boundary** between our four pieces. Josh (C++), Victor and Ben (Python) and Cameron (TypeScript) cannot share a types package, so **this file is the shared source of truth**. Everyone builds and mocks against it.
 
@@ -149,6 +149,7 @@ def search_symbols(query: str, k: int) -> list[dict]:
 | Ben → Cameron | `chatDone` | End of the AI answer |
 | Ben → Cameron | `nodeSnippet` | Source code of one node (for the drawer) |
 | Ben → Cameron | `error` | Something failed; UI shows it instead of hanging **[CONFIRM]** |
+| Cameron → Ben | `loadRepository` | User submitted a repository URL |
 | Cameron → Ben | `nodeClicked` | User clicked a node |
 | Cameron → Ben | `askAI` | User asked a question |
 
@@ -226,6 +227,17 @@ def search_symbols(query: str, k: int) -> list[dict]:
 
 ### 3.3 Cameron → Ben
 
+**`loadRepository`**
+```json
+{
+  "type": "loadRepository",
+  "repositoryUrl": "https://github.com/owner/repository"
+}
+```
+- Sent after the WebSocket connects and again after reconnecting.
+- `repositoryUrl` must be non-empty. v0.1 accepts any non-empty string for testing; validation, cloning, and indexing remain backend responsibilities.
+- The server refreshes or serves graph data for the selected repository. The current scaffold acknowledges the selection and sends the current `graphData`.
+
 **`askAI`**
 ```json
 {
@@ -248,6 +260,8 @@ def search_symbols(query: str, k: int) -> list[dict]:
 **On connect**
 ```
 UI  ──connect──►  Server
+UI  ◄──graphData──  Server
+UI  ──loadRepository {repositoryUrl}──► Server
 UI  ◄──graphData──  Server
 ```
 
@@ -370,6 +384,7 @@ export type ServerMessage =
 
 // Cameron -> Ben
 export type ClientMessage =
+  | { type: 'loadRepository'; repositoryUrl: string }
   | { type: 'askAI'; question: string; nodeId?: string }
   | { type: 'nodeClicked'; id: string };
 ```
@@ -428,6 +443,10 @@ class ErrorMessage(WireModel):
     message: str
 
 # Cameron -> Ben
+class LoadRepository(WireModel):
+    type: Literal["loadRepository"]
+    repository_url: str
+
 class AskAI(WireModel):
     type: Literal["askAI"]
     question: str
@@ -437,7 +456,7 @@ class NodeClicked(WireModel):
     type: Literal["nodeClicked"]
     id: str
 
-ClientMessage = Union[AskAI, NodeClicked]
+ClientMessage = Union[LoadRepository, AskAI, NodeClicked]
 ```
 
 ### 6.3 Victor's return type (Python)
@@ -507,3 +526,4 @@ Expected result for the question *"What breaks if I change DatabasePool?"* with 
 | Version | Date | Change | Agreed by |
 |---|---|---|---|
 | v0.1 | 2026-10-02 | Initial draft | (pending team lock) |
+| v0.2 | 2026-10-03 | Added Cameron → Ben `loadRepository` WebSocket message carrying `repositoryUrl`; v0.1 accepts any non-empty string for testing and the scaffold re-serves current graph data. | Cameron / Ben pending |

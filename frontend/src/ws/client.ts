@@ -8,9 +8,9 @@ export class GraphSocket {
   private reconnectTimer?: number
   private closedByUser = false
 
-  connect() {
+  connect(repositoryUrl?: string) {
     this.closedByUser = false
-    this.open()
+    this.open(repositoryUrl)
   }
 
   close() {
@@ -26,13 +26,16 @@ export class GraphSocket {
     return true
   }
 
-  private open() {
+  private open(repositoryUrl?: string) {
     const url = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws'
     useGraphStore.getState().setConnectionStatus('connecting')
     this.socket = new WebSocket(url)
 
     this.socket.addEventListener('open', () => {
       useGraphStore.getState().setConnectionStatus('connected')
+      if (repositoryUrl) {
+        this.send({ type: 'loadRepository', repositoryUrl })
+      }
     })
     this.socket.addEventListener('message', (event) => {
       this.handleMessage(JSON.parse(event.data) as ServerMessage)
@@ -40,7 +43,10 @@ export class GraphSocket {
     this.socket.addEventListener('close', () => {
       useGraphStore.getState().setConnectionStatus('disconnected')
       if (!this.closedByUser) {
-        this.reconnectTimer = window.setTimeout(() => this.open(), reconnectDelayMs)
+        this.reconnectTimer = window.setTimeout(
+          () => this.open(repositoryUrl),
+          reconnectDelayMs,
+        )
       }
     })
     this.socket.addEventListener('error', () => {

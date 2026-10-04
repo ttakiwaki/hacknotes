@@ -12,6 +12,7 @@ from contracts import (
     ErrorMessage,
     GraphData,
     HighlightNodes,
+    LoadRepository,
     NodeClicked,
     NodeSnippet,
 )
@@ -51,6 +52,7 @@ def startup_event():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    repository_url = None
 
     # Always reload graph on connect to catch DB updates
     graph_engine.load_from_db()
@@ -74,7 +76,24 @@ async def websocket_endpoint(websocket: WebSocket):
 
             msg_type = payload.get("type")
 
-            if msg_type == "nodeClicked":
+            if msg_type == "loadRepository":
+                try:
+                    msg = LoadRepository.model_validate(payload)
+                    repository_url = msg.repository_url
+                    print(f"Repository requested: {repository_url}")
+                    graph_engine.load_from_db()
+                    graph_msg = GraphData(
+                        nodes=list(graph_engine.nodes_dict.values()),
+                        edges=graph_engine.edges_list,
+                    )
+                    await websocket.send_text(
+                        graph_msg.model_dump_json(by_alias=True)
+                    )
+                except ValidationError as e:
+                    err = ErrorMessage(code="BAD_REQUEST", message=str(e))
+                    await websocket.send_text(err.model_dump_json(by_alias=True))
+
+            elif msg_type == "nodeClicked":
                 try:
                     msg = NodeClicked.model_validate(payload)
                     snippet_code = graph_engine.get_snippet(msg.id)

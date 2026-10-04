@@ -32,5 +32,6 @@ export type ServerMessage =
   | { type: 'error'; code: ErrorCode; message: string }
 
 export type ClientMessage =
+  | { type: 'loadRepository'; repositoryUrl: string }
   | { type: 'askAI'; question: string; nodeId?: string }
   | { type: 'nodeClicked'; id: string }
