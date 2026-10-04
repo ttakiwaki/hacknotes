@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="30 20 510 216" role="img" aria-labelledby="uxie-lockup-title">
+<title id="uxie-lockup-title">Uxie logo</title>
+<g fill="none" stroke="#171717" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+<path d="M68 60 V146 A60 60 0 0 0 188 146 V60" stroke-width="26"/>
+<circle cx="68" cy="60" r="22" fill="#171717" stroke="none"/>
+<circle cx="188" cy="60" r="22" fill="#171717" stroke="none"/>
+<g transform="translate(126,213)">
+<path d="M132 -120 L204 -8" transform="translate(-10 0)"/>
+<path d="M204 -120 L132 -8" transform="translate(-10 0)"/>
+<path d="M252 -120 V-6"/>
+<path d="M373 -86 A44 44 0 1 0 373 -14" transform="translate(4 0)"/>
+<path d="M318 -50 H386" transform="translate(4 0)"/>
+<circle cx="252" cy="-162" r="17" fill="#171717" stroke="none"/>
+</g>
+</g>
+</svg>
