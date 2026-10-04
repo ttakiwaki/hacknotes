@@ -1,16 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
+  MiniMap,
   ReactFlow,
+  ReactFlowProvider,
   Handle,
   Position,
+  getBezierPath,
+  useReactFlow,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
+  type Viewport,
 } from "@xyflow/react";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { GraphEdge, GraphNode } from "../types/contracts";
+import { GRAPH_COLORS } from "../theme";
+import { useGraphStore } from "../store/useGraphStore";
 
 interface CodeNodeData extends Record<string, unknown> {
   graphNode: GraphNode;
@@ -23,7 +32,35 @@ interface GraphCanvasProps {
   edges: GraphEdge[];
   impactedNodeIds: string[];
   selectedNodeId?: string;
+  showDefines: boolean;
   onNodeClick: (id: string) => void;
+}
+
+// Edge look per relationship type. DEFINES (file contains symbol) is
+// structural and numerous, so it stays thin, dashed, and label-free;
+// CALLS/IMPORTS carry the signal and get color + labels.
+// Strokes come from the active theme (GRAPH_COLORS), so they are passed
+// as inline styles referencing the same palette as the MiniMap.
+function edgeStyle(type: string, theme: keyof typeof GRAPH_COLORS) {
+  const c = GRAPH_COLORS[theme];
+  switch (type) {
+    case "CALLS":
+      return { stroke: c.calls, strokeWidth: 2 };
+    case "IMPORTS":
+      return { stroke: c.imports, strokeWidth: 2 };
+    default:
+      return { stroke: c.defines, strokeWidth: 1.25, strokeDasharray: "4 3" };
+  }
+}
+
+function minimapColor(theme: keyof typeof GRAPH_COLORS) {
+  const c = GRAPH_COLORS[theme];
+  return (node: Node) => {
+    const t = (node.data as CodeNodeData | undefined)?.graphNode.type;
+    if (t === "class") return c.class;
+    if (t === "file") return c.file;
+    return c.function;
+  };
 }
 
 const elk = new ELK();
@@ -40,14 +77,62 @@ function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
     >
       <Handle className="flow-handle" position={Position.Left} type="target" />
       <span className="node-type">{graphNode.type}</span>
-      <strong>{graphNode.name}</strong>
-      <small>{graphNode.path}</small>
+      <strong title={graphNode.name}>{graphNode.name}</strong>
+      <small title={graphNode.path}>{graphNode.path}</small>
       <Handle className="flow-handle" position={Position.Right} type="source" />
     </div>
   );
 }
 
 const nodeTypes = { code: CodeNode };
+
+// Curvy edge with per-edge curvature. Parallel edges (same endpoints)
+// would draw as one stacked line, so each edge gets a deterministic
+// bend from its index that fans them apart. Colors still come from
+// the `style` prop set in flowEdges (CALLS orange, IMPORTS blue,
+// DEFINES gray dashed).
+function CurvyEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style,
+  label,
+  data,
+}: EdgeProps<Edge<{ bend?: number }>>) {
+  const bend = data?.bend ?? 0;
+  const [path, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    curvature: 0.3 + bend,
+  });
+  return (
+    <>
+      <BaseEdge id={id} path={path} style={style} />
+      {label != null && (
+        <EdgeLabelRenderer>
+          <div
+            className="edge-tag"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            }}
+          >
+            {String(label)}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { curvy: CurvyEdge };
 
 async function layoutGraph(
   nodes: Node<CodeNodeData>[],
@@ -58,9 +143,12 @@ async function layoutGraph(
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
-      "elk.edgeRouting": "ORTHOGONAL",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "70",
-      "elk.spacing.nodeNode": "35",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "110",
+      "elk.spacing.nodeNode": "55",
+      "elk.spacing.edgeNode": "40",
+      "elk.spacing.edgeEdge": "20",
+      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.layered.crossingMinimization.semiInteractive": "true",
     },
     children: nodes.map((node) => ({
       id: node.id,
@@ -86,24 +174,133 @@ async function layoutGraph(
   }));
 }
 
-export function GraphCanvas({
+export function GraphCanvas(props: GraphCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <GraphCanvasInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+// Pan momentum: track viewport velocity while the user drags, then keep
+// gliding with friction after release. Wheel/programmatic moves never
+// record samples, so zooming can't trigger or disturb a glide.
+function useGlide() {
+  const { setViewport } = useReactFlow();
+  const frame = useRef<number | null>(null);
+  const samples = useRef<{ x: number; y: number; t: number }[]>([]);
+
+  useEffect(
+    () => () => {
+      if (frame.current != null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
+
+  const cancel = () => {
+    if (frame.current != null) {
+      cancelAnimationFrame(frame.current);
+      frame.current = null;
+    }
+  };
+
+  const onMoveStart = () => {
+    cancel();
+    samples.current = [];
+  };
+
+  const onMove = (event: unknown, vp: Viewport) => {
+    if (
+      event == null ||
+      (event as Event).type === "wheel" ||
+      frame.current != null
+    )
+      return;
+    const s = samples.current;
+    s.push({ x: vp.x, y: vp.y, t: performance.now() });
+    if (s.length > 8) s.shift();
+  };
+
+  const onMoveEnd = (event: unknown, vp: Viewport) => {
+    if (event == null || (event as Event).type === "wheel") return;
+    const s = samples.current;
+    if (s.length < 2) return;
+    const first = s[0];
+    const last = s[s.length - 1];
+    const dt = (last.t - first.t) / 1000;
+    if (dt <= 0) return;
+    let vx = (last.x - first.x) / dt;
+    let vy = (last.y - first.y) / dt;
+    const speed = Math.hypot(vx, vy);
+    if (speed < 120) return;
+    const cap = 3000;
+    const k = Math.min(1, cap / speed);
+    vx *= k;
+    vy *= k;
+    let x = vp.x;
+    let y = vp.y;
+    const zoom = vp.zoom;
+    let prev = performance.now();
+    const step = (now: number) => {
+      const d = Math.min(0.05, (now - prev) / 1000);
+      prev = now;
+      const friction = Math.pow(0.02, d);
+      x += vx * d;
+      y += vy * d;
+      vx *= friction;
+      vy *= friction;
+      setViewport({ x, y, zoom });
+      if (Math.hypot(vx, vy) > 25) {
+        frame.current = requestAnimationFrame(step);
+      } else {
+        frame.current = null;
+      }
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
+  return { onMoveStart, onMove, onMoveEnd };
+}
+
+function GraphCanvasInner({
   nodes,
   edges,
   impactedNodeIds,
   selectedNodeId,
+  showDefines,
   onNodeClick,
 }: GraphCanvasProps) {
   const [layoutedNodes, setLayoutedNodes] = useState<Node<CodeNodeData>[]>([]);
-  const flowEdges = useMemo<Edge[]>(
+  const glide = useGlide();
+  const theme = useGraphStore((s) => s.theme);
+  const mapColor = useMemo(() => minimapColor(theme), [theme]);
+  // Layout always sees the full edge set so toggling DEFINES on/off
+  // doesn't reshuffle node positions; only rendering is filtered.
+  const layoutEdges = useMemo<Edge[]>(
     () =>
       edges.map((edge, index) => ({
         id: `${edge.source}-${edge.target}-${edge.type}-${index}`,
         source: edge.source,
         target: edge.target,
-        label: edge.type,
-        className: `flow-edge edge-${edge.type.toLowerCase()}`,
       })),
     [edges],
+  );
+  const flowEdges = useMemo<Edge[]>(
+    () =>
+      edges
+        .filter((edge) => showDefines || edge.type !== "DEFINES")
+        .map((edge, index) => ({
+          id: `${edge.source}-${edge.target}-${edge.type}-${index}`,
+          source: edge.source,
+          target: edge.target,
+          type: "curvy",
+          animated: edge.type === "CALLS",
+          label: edge.type === "DEFINES" ? undefined : edge.type,
+          style: edgeStyle(edge.type, theme),
+          data: { bend: ((index % 5) - 2) * 0.22 },
+          className: `flow-edge edge-${edge.type.toLowerCase()}`,
+        })),
+    [edges, showDefines, theme],
   );
 
   useEffect(() => {
@@ -112,6 +309,10 @@ export function GraphCanvas({
       id: graphNode.id,
       type: "code",
       position: { x: 0, y: 0 },
+      // Explicit dimensions (match .flow-node CSS): ELK lays out with
+      // these, and MiniMap needs them to draw visible node rects.
+      width: nodeWidth,
+      height: nodeHeight,
       data: {
         graphNode,
         impacted: impactedNodeIds.includes(graphNode.id),
@@ -119,13 +320,13 @@ export function GraphCanvas({
       },
     }));
 
-    void layoutGraph(baseNodes, flowEdges).then((result) => {
+    void layoutGraph(baseNodes, layoutEdges).then((result) => {
       if (!cancelled) setLayoutedNodes(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [flowEdges, impactedNodeIds, nodes, selectedNodeId]);
+  }, [layoutEdges, impactedNodeIds, nodes, selectedNodeId]);
 
   return (
     <div className="graph-canvas">
@@ -133,14 +334,18 @@ export function GraphCanvas({
         nodes={layoutedNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.25}
         onNodeClick={(_, node) => onNodeClick(node.id)}
+        onMoveStart={glide.onMoveStart}
+        onMove={glide.onMove}
+        onMoveEnd={glide.onMoveEnd}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#2a302e" gap={24} size={1} />
-        <Controls />
+        <Controls showInteractive={false} position="bottom-right" />
+        <MiniMap pannable zoomable nodeColor={mapColor} position="bottom-left" />
       </ReactFlow>
     </div>
   );
