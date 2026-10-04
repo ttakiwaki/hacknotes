@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="uxie-mark-title">
+<title id="uxie-mark-title">Uxie U symbol</title>
+<g id="symbol">
+<path d="M68 60 V146 A60 60 0 0 0 188 146 V60" fill="none" stroke="currentColor" stroke-width="26" stroke-linecap="round"/>
+<circle cx="68" cy="60" r="22" fill="currentColor"/>
+<circle cx="188" cy="60" r="22" fill="currentColor"/>
+</g>
+</svg>

@@ -146,18 +146,11 @@ body { background: var(--paper); }
   text-align: center;
 }
 
-.landing-mark {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 30px;
-  place-items: center;
-  color: var(--on-dark);
-  background: var(--dark);
-  border-radius: 50%;
-  font-size: 38px;
-  font-weight: 700;
-  line-height: 1;
+.landing-lockup {
+  width: min(210px, 62vw);
+  height: auto;
+  margin-bottom: 22px;
+  color: var(--ink);
 }
 
 .landing-page h1 {
@@ -346,6 +339,8 @@ h2 { font-size: 20px; }
 .resize-handle:hover { border-left-color: var(--muted); box-shadow: inset 2px 0 0 var(--muted); }
 .resize-handle:hover::after { opacity: 1; }
 .panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.graph-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.graph-mark { width: 30px; height: 30px; flex: none; color: var(--ink); }
 .legend { padding-top: 4px; }
 
 .graph-canvas {
