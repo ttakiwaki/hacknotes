@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BaseEdge,
   Controls,
@@ -6,6 +6,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  applyNodeChanges,
   Handle,
   Position,
   getBezierPath,
@@ -13,6 +14,7 @@ import {
   type Edge,
   type EdgeProps,
   type Node,
+  type NodeChange,
   type NodeProps,
   type Viewport,
 } from "@xyflow/react";
@@ -71,7 +73,9 @@ function minimapColor(theme: keyof typeof GRAPH_COLORS) {
   };
 }
 
-function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
+// Memoized so selection changes only re-render nodes whose flags actually
+// changed (the sync effect below preserves object identity otherwise).
+const CodeNode = memo(function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
   const { graphNode, impacted, selected, dimmed } = data;
   const ext =
     graphNode.type === "file"
@@ -94,7 +98,7 @@ function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
       <Handle className="flow-handle" position={Position.Right} type="source" />
     </div>
   );
-}
+});
 
 const nodeTypes = { code: CodeNode };
 
@@ -103,7 +107,36 @@ const nodeTypes = { code: CodeNode };
 // bend from its index that fans them apart. Colors still come from
 // the `style` prop set in flowEdges (CALLS orange, IMPORTS blue,
 // DEFINES gray dashed).
-function CurvyEdge({
+// Memoized with a custom comparator: flowEdges rebuilds every object on
+// each selection change, but only edges touching the selection actually
+// change visually (opacity). Everything else skips re-render. The check is
+// fail-open: any unrecognized difference re-renders.
+function curvyEdgeEqual(
+  prev: EdgeProps<Edge<{ bend?: number }>>,
+  next: EdgeProps<Edge<{ bend?: number }>>,
+) {
+  if (prev === next) return true;
+  const p = prev as unknown as Record<string, unknown>;
+  const n = next as unknown as Record<string, unknown>;
+  const keys = new Set([...Object.keys(p), ...Object.keys(n)]);
+  for (const key of keys) {
+    if (key === "style" || key === "data") continue;
+    if (!Object.is(p[key], n[key])) return false;
+  }
+  const pd = (prev.data ?? {}) as { bend?: number };
+  const nd = (next.data ?? {}) as { bend?: number };
+  if (pd.bend !== nd.bend) return false;
+  const ps = (prev.style ?? {}) as Record<string, unknown>;
+  const ns = (next.style ?? {}) as Record<string, unknown>;
+  return (
+    ps.stroke === ns.stroke &&
+    ps.strokeWidth === ns.strokeWidth &&
+    ps.strokeDasharray === ns.strokeDasharray &&
+    ps.opacity === ns.opacity
+  );
+}
+
+const CurvyEdge = memo(function CurvyEdge({
   id,
   sourceX,
   sourceY,
@@ -142,7 +175,7 @@ function CurvyEdge({
       )}
     </>
   );
-}
+}, curvyEdgeEqual);
 
 const edgeTypes = { curvy: CurvyEdge };
 
@@ -334,6 +367,18 @@ function GraphCanvasInner({
     return ids;
   }, [edges, selectedNodeId]);
 
+  // Controlled nodes: lets React Flow apply drags/selection internally so
+  // interaction never waits on our state, and drags stick until the next
+  // full layout.
+  const onNodesChange = useCallback(
+    (changes: NodeChange<Node<CodeNodeData>>[]) =>
+      setLayoutedNodes((current) => applyNodeChanges(changes, current)),
+    [],
+  );
+
+  // Full ELK layout only when the graph itself changes. Clicks must never
+  // re-run this: it is async and replaces every position, which is what
+  // was swallowing the zoom animation and stuttering.
   useEffect(() => {
     let cancelled = false;
     const baseNodes: Node<CodeNodeData>[] = nodes.map((graphNode) => ({
@@ -358,25 +403,34 @@ function GraphCanvasInner({
     return () => {
       cancelled = true;
     };
-  }, [
-    connectedNodeIds,
-    layoutEdges,
-    impactedNodeIds,
-    nodes,
-    selectedNodeId,
-  ]);
+  }, [nodes, layoutEdges]);
 
+  // Selection/impact styling without moving nodes: merge fresh flags,
+  // keeping object identity (and memoization) for everything unchanged.
   useEffect(() => {
-    if (!selectedNodeId) return;
-    const node = layoutedNodes.find((item) => item.id === selectedNodeId);
-    if (!node) return;
-    const width = node.measured?.width ?? node.width ?? nodeWidth;
-    const height = node.measured?.height ?? node.height ?? nodeHeight;
-    void setCenter(node.position.x + width / 2, node.position.y + height / 2, {
-      zoom: 1.1,
-      duration: 500,
+    setLayoutedNodes((current) => {
+      if (current.length === 0) return current;
+      const ids = new Set(current.map((node) => node.id));
+      if (!nodes.every((node) => ids.has(node.id))) return current;
+      let changed = false;
+      const next = current.map((node) => {
+        const impacted = impactedNodeIds.includes(node.id);
+        const selected = selectedNodeId === node.id;
+        const dimmed =
+          selectedNodeId !== undefined && !connectedNodeIds.has(node.id);
+        const d = node.data;
+        if (
+          d.impacted === impacted &&
+          d.selected === selected &&
+          d.dimmed === dimmed
+        )
+          return node;
+        changed = true;
+        return { ...node, data: { ...d, impacted, selected, dimmed } };
+      });
+      return changed ? next : current;
     });
-  }, [layoutedNodes, selectedNodeId, setCenter]);
+  }, [connectedNodeIds, impactedNodeIds, nodes, selectedNodeId]);
 
   const focusNode = (node: Node<CodeNodeData>) => {
     const width = node.measured?.width ?? node.width ?? nodeWidth;
@@ -393,11 +447,13 @@ function GraphCanvasInner({
       <ReactFlow
         nodes={layoutedNodes}
         edges={flowEdges}
+        onNodesChange={onNodesChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.25}
+        onlyRenderVisibleElements
         onNodeClick={(_, node) => focusNode(node)}
         onMoveStart={glide.onMoveStart}
         onMove={glide.onMove}
