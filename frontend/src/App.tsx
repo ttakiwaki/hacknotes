@@ -32,7 +32,7 @@ const mockSnippet = `export class DatabasePoolaaaaaaaaaaaaaaaaaa {
 }`;
 
 // Set to false to use the FastAPI/WebSocket backend.
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 function App() {
   const [repositoryUrl, setRepositoryUrl] = useState("");
