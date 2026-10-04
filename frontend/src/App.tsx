@@ -523,7 +523,12 @@ function App() {
                   ×
                 </button>
               </div>
-              <SnippetDrawer node={selectedNode} code={selectedSnippet} />
+              <SnippetDrawer
+                node={selectedNode}
+                code={selectedSnippet}
+                nodes={nodes}
+                onNavigate={navigateToNode}
+              />
               <div id="debugger">
                 <ChatPanel
                   messages={chatMessages}

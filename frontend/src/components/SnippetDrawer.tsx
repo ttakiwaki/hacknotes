@@ -7,6 +7,8 @@ import type { ThemeName } from '../theme'
 interface SnippetDrawerProps {
   node?: GraphNode
   code?: string
+  nodes: GraphNode[]
+  onNavigate: (id: string) => void
 }
 
 function languageForPath(path: string): string {
@@ -36,7 +38,12 @@ function shikiTheme(theme: ThemeName): string {
   }
 }
 
-export function SnippetDrawer({ node, code }: SnippetDrawerProps) {
+export function SnippetDrawer({
+  node,
+  code,
+  nodes,
+  onNavigate,
+}: SnippetDrawerProps) {
   const [highlightedCode, setHighlightedCode] = useState('')
   const theme = useGraphStore((s) => s.theme)
 
@@ -65,13 +72,30 @@ export function SnippetDrawer({ node, code }: SnippetDrawerProps) {
     )
   }
 
+  // The path rides to the file node so a symbol's location is one click.
+  const fileNode =
+    node.type === 'file'
+      ? node
+      : nodes.find((n) => n.type === 'file' && n.path === node.path)
+
   return (
     <section className="snippet-drawer" aria-label={`Source for ${node.name}`}>
       <div className="snippet-meta">
         <strong>{node.name}</strong>
-        <span>
-          {node.path}:{node.startLine}-{node.endLine}
-        </span>
+        {fileNode ? (
+          <button
+            type="button"
+            className="node-mention"
+            title={`Go to ${fileNode.path}`}
+            onClick={() => onNavigate(fileNode.id)}
+          >
+            {node.path}:{node.startLine}-{node.endLine}
+          </button>
+        ) : (
+          <span>
+            {node.path}:{node.startLine}-{node.endLine}
+          </span>
+        )}
       </div>
       {code ? (
         <div
