@@ -21,6 +21,7 @@ body { background: var(--paper); }
   height: 100svh;
   padding: 12px;
   overflow: hidden;
+  overscroll-behavior: none;
   color: var(--ink);
   background:
     radial-gradient(circle at 15% 30%, rgba(239, 154, 200, 0.08), transparent 22rem),
@@ -156,6 +157,7 @@ h2 { font-size: 20px; }
   height: calc(100svh - 24px);
   margin: 0 auto;
   overflow: hidden;
+  overscroll-behavior: none;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -178,6 +180,7 @@ h2 { font-size: 20px; }
   min-width: 0;
   padding: 30px;
   overflow-y: auto;
+  overscroll-behavior: none;
   background: var(--soft);
   border-left: 1px solid var(--line);
   animation: inspector-in 220ms ease-out;
@@ -251,12 +254,36 @@ h2 { font-size: 20px; }
 .snippet-drawer { margin: 30px 0; }
 .snippet-meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: var(--muted); font: 11px ui-monospace, SFMono-Regular, monospace; }
 .snippet-meta strong { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
-.snippet-highlight, .snippet { min-height: 150px; max-height: 320px; margin: 0; overflow: auto; color: #2c3c31; background: #fff; border: 1px solid var(--line); border-radius: 12px; font: 12px/1.7 ui-monospace, SFMono-Regular, monospace; white-space: pre-wrap; }
-.snippet-highlight pre { margin: 0; padding: 18px; }
+.snippet-highlight, .snippet {
+  min-height: 150px;
+  max-height: 320px;
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: none;
+  color: #2c3c31;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: 12px/1.7 ui-monospace, SFMono-Regular, monospace;
+  white-space: pre-wrap;
+}
+
+.snippet-highlight pre {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.snippet-highlight code {
+  display: block;
+  min-width: max-content;
+}
 .empty-state { margin: 30px 0; color: var(--muted); font-size: 14px; }
 
 .chat { margin-top: 32px; }
-.messages { display: grid; gap: 10px; max-height: 220px; margin: 16px 0; overflow: auto; }
+.messages { display: grid; gap: 10px; max-height: 220px; margin: 16px 0; overflow: auto; overscroll-behavior: none; }
 .message { padding: 11px 13px; font-size: 13px; line-height: 1.5; border-radius: 10px; }
 .message-user { color: white; background: var(--dark); }
 .message-assistant { color: var(--ink); background: var(--lavender); }
