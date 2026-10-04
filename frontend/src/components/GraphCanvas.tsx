@@ -3,6 +3,7 @@ import {
   BaseEdge,
   Controls,
   EdgeLabelRenderer,
+  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   Handle,
@@ -54,6 +55,21 @@ function edgeStyle(type: string, theme: keyof typeof GRAPH_COLORS) {
 const elk = new ELK();
 const nodeWidth = 190;
 const nodeHeight = 88;
+
+function minimapColor(theme: keyof typeof GRAPH_COLORS) {
+  const c = GRAPH_COLORS[theme];
+  return (node: Node) => {
+    const g = (node.data as CodeNodeData | undefined)?.graphNode;
+    if (g?.type === "file") {
+      const ext = (g.path.split(".").pop() ?? "").toLowerCase();
+      if (ext === "html") return c.fileHtml;
+      if (ext === "css") return c.fileCss;
+      return c.file;
+    }
+    if (g?.type === "class") return c.class;
+    return c.function;
+  };
+}
 
 function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
   const { graphNode, impacted, selected, dimmed } = data;
@@ -270,6 +286,7 @@ function GraphCanvasInner({
   const glide = useGlide();
   const { setCenter } = useReactFlow();
   const theme = useGraphStore((s) => s.theme);
+  const mapColor = useMemo(() => minimapColor(theme), [theme]);
   // Layout always sees the full edge set so toggling DEFINES on/off
   // doesn't reshuffle node positions; only rendering is filtered.
   const layoutEdges = useMemo<Edge[]>(
@@ -388,6 +405,14 @@ function GraphCanvasInner({
         proOptions={{ hideAttribution: true }}
       >
         <Controls showInteractive={false} position="bottom-right" />
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor={mapColor}
+          bgColor="var(--paper)"
+          maskColor="var(--canvas-bg)"
+          position="bottom-left"
+        />
       </ReactFlow>
     </div>
   );

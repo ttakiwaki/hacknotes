@@ -692,6 +692,21 @@ h2 {
   border-bottom: 1px solid var(--line);
   fill: var(--ink);
 }
+.react-flow__minimap {
+  background: var(--paper) !important;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.react-flow__minimap-mask {
+  fill: var(--canvas-bg);
+  fill-opacity: 0.85;
+  stroke: var(--line);
+}
+.react-flow__minimap-node {
+  stroke: var(--paper);
+  stroke-width: 1;
+}
 .react-flow__edge-text {
   fill: var(--muted);
   font:
