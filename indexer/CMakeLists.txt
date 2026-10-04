@@ -46,6 +46,16 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-python.git
   GIT_TAG v0.25.0
 )
+FetchContent_Declare(
+  tree_sitter_html
+  GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-html.git
+  GIT_TAG v0.23.2
+)
+FetchContent_Declare(
+  tree_sitter_css
+  GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-css.git
+  GIT_TAG v0.25.0
+)
 FetchContent_GetProperties(tree_sitter)
 if(NOT tree_sitter_POPULATED)
   FetchContent_Populate(tree_sitter)
@@ -61,6 +71,14 @@ endif()
 FetchContent_GetProperties(tree_sitter_python)
 if(NOT tree_sitter_python_POPULATED)
   FetchContent_Populate(tree_sitter_python)
+endif()
+FetchContent_GetProperties(tree_sitter_html)
+if(NOT tree_sitter_html_POPULATED)
+  FetchContent_Populate(tree_sitter_html)
+endif()
+FetchContent_GetProperties(tree_sitter_css)
+if(NOT tree_sitter_css_POPULATED)
+  FetchContent_Populate(tree_sitter_css)
 endif()
 
 add_library(tree-sitter-core "${tree_sitter_SOURCE_DIR}/lib/src/lib.c")
@@ -104,6 +122,24 @@ target_include_directories(tree-sitter-py PUBLIC
   "${tree_sitter_python_SOURCE_DIR}/src"
 )
 
+add_library(tree-sitter-html
+  "${tree_sitter_html_SOURCE_DIR}/src/parser.c"
+  "${tree_sitter_html_SOURCE_DIR}/src/scanner.c"
+)
+target_include_directories(tree-sitter-html PUBLIC
+  "${tree_sitter_SOURCE_DIR}/lib/include"
+  "${tree_sitter_html_SOURCE_DIR}/src"
+)
+
+add_library(tree-sitter-css
+  "${tree_sitter_css_SOURCE_DIR}/src/parser.c"
+  "${tree_sitter_css_SOURCE_DIR}/src/scanner.c"
+)
+target_include_directories(tree-sitter-css PUBLIC
+  "${tree_sitter_SOURCE_DIR}/lib/include"
+  "${tree_sitter_css_SOURCE_DIR}/src"
+)
+
 add_executable(indexer
   src/main.cpp
   src/db.cpp
@@ -113,4 +149,4 @@ add_executable(indexer
 
 target_include_directories(indexer PRIVATE src third_party)
 target_compile_definitions(indexer PRIVATE QUERIES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/queries")
-target_link_libraries(indexer PRIVATE SQLite::SQLite3 tree-sitter-core tree-sitter-tsx tree-sitter-ts tree-sitter-js tree-sitter-py)
+target_link_libraries(indexer PRIVATE SQLite3::SQLite3 tree-sitter-core tree-sitter-tsx tree-sitter-ts tree-sitter-js tree-sitter-py tree-sitter-html tree-sitter-css)

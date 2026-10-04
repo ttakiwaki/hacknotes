@@ -1,6 +1,7 @@
 # indexer (Josh)
 
-Walks a workspace of `.ts`/`.tsx`/`.js`/`.jsx`/`.py` files and writes
+Walks a workspace of `.ts`/`.tsx`/`.js`/`.jsx`/`.py`/`.html`/`.css`
+files and writes
 `files` / `nodes` / `edges` per `CONTRACTS.md` (stable `path::name::type`
 ids, WAL, 1-indexed lines).
 
@@ -34,14 +35,20 @@ CALLS resolution: same-file definition wins, else a unique repo-wide
 definition, else skipped as ambiguous; calls to unknown names are dropped
 (no dangling edges). Top-level calls have no function caller and are skipped.
 
-IMPORTS: relative paths resolved to `.ts`/`.tsx`/`index` files in the
-workspace; bare packages and missing targets are dropped.
+IMPORTS: relative paths resolved against the files table (script,
+markup, and style extensions plus `index` files); bare packages, remote
+URLs, and missing targets are dropped.
 
 Languages: `.ts`/`.tsx` (tree-sitter-typescript), `.js`/`.jsx`
 (tree-sitter-javascript, same query layout as TS), `.py`
 (tree-sitter-python: `def`/`class`/named `lambda`, `from`/`import` with
-dotted-name resolution to `.py`/`__init__.py`). One query file per family
-(`tsx.scm`, `js.scm`, `py.scm`); pattern indices are per-file.
+dotted-name resolution to `.py`/`__init__.py`), `.html`/`.css`
+(file nodes + IMPORTS only: `href`/`src` attributes, CSS `@import`/`url()`;
+no new symbol kinds, so no contract change). One query file per family
+(`tsx.scm`, `js.scm`, `py.scm`, `html.scm`, `css.scm`); pattern indices
+are per-file. Note: this tree-sitter build does not evaluate `#eq?` /
+`#match?` text predicates (verified empirically), so attribute filtering
+(`href` vs `rel`, `url()`) happens in C++ via `@imp.key` captures.
 
 `sample-workspace/` is the contract mock (pool/users/server) with exact
 line numbers. Regenerate the root `sample.db` with:

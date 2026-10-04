@@ -56,9 +56,14 @@ function edgeStyle(type: string, theme: keyof typeof GRAPH_COLORS) {
 function minimapColor(theme: keyof typeof GRAPH_COLORS) {
   const c = GRAPH_COLORS[theme];
   return (node: Node) => {
-    const t = (node.data as CodeNodeData | undefined)?.graphNode.type;
-    if (t === "class") return c.class;
-    if (t === "file") return c.file;
+    const g = (node.data as CodeNodeData | undefined)?.graphNode;
+    if (g?.type === "file") {
+      const ext = (g.path.split(".").pop() ?? "").toLowerCase();
+      if (ext === "html") return c.fileHtml;
+      if (ext === "css") return c.fileCss;
+      return c.file;
+    }
+    if (g?.type === "class") return c.class;
     return c.function;
   };
 }
@@ -69,9 +74,15 @@ const nodeHeight = 88;
 
 function CodeNode({ data }: NodeProps<Node<CodeNodeData>>) {
   const { graphNode, impacted, selected } = data;
+  const ext =
+    graphNode.type === "file"
+      ? (graphNode.path.split(".").pop() ?? "").toLowerCase()
+      : "";
+  const extClass =
+    ext === "html" || ext === "css" ? ` node-ext-${ext}` : "";
   return (
     <div
-      className={`flow-node node-${graphNode.type} ${
+      className={`flow-node node-${graphNode.type}${extClass} ${
         impacted ? "flow-node-impacted" : ""
       } ${selected ? "flow-node-selected" : ""}`}
     >
