@@ -611,6 +611,122 @@ h2 {
   background-size: 24px 24px;
 }
 
+/* Universal prompt bar: floats over the canvas so it costs no layout. */
+.graph-wrap {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  margin-top: 28px;
+}
+.graph-wrap .graph-canvas {
+  margin-top: 0;
+  height: 100%;
+}
+.promptbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 10;
+  width: min(560px, calc(100% - 24px));
+  transform: translateX(-50%);
+}
+.promptbar-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 9px 9px 14px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(8px);
+}
+.promptbar-input input {
+  min-width: 0;
+  flex: 1;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 13px;
+}
+.promptbar-input button {
+  flex: none;
+  padding: 7px 16px;
+  color: var(--on-dark);
+  background: var(--dark);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.promptbar-input button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.promptbar-answer {
+  margin-top: 8px;
+  max-height: min(320px, 40vh);
+  overflow-y: auto;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 96%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+}
+.promptbar-answer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.promptbar-target {
+  overflow: hidden;
+  font:
+    10px ui-monospace,
+    SFMono-Regular,
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.promptbar-target-none {
+  color: var(--muted);
+}
+.promptbar-close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.promptbar-close:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.promptbar-answer-body {
+  padding: 4px 14px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.promptbar-answer-body pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
 .close-inspector {
   width: 30px;
   height: 30px;
@@ -979,6 +1095,35 @@ h2 {
   color: var(--node-ink);
   background: var(--node-class);
   border-radius: 3px;
+}
+button.node-mention {
+  cursor: pointer;
+  font: inherit;
+  border: 0;
+}
+button.node-mention:hover {
+  outline: 1px solid var(--node-line);
+}
+.promptbar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.promptbar-chip {
+  padding: 5px 12px;
+  color: var(--ink);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.promptbar-chip:hover {
+  border-color: var(--ink);
 }
 .error-message {
   color: #b93e38;

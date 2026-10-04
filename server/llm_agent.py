@@ -43,6 +43,69 @@ class LLMAgent:
 
         return None
 
+    def find_context(self, question: str, k: int = 5) -> list[str]:
+        """
+        Semantic context for general (target-less) questions: top-k symbols
+        from Victor's search_symbols. Empty when search is unavailable.
+        """
+        if not self.search_symbols:
+            return []
+        try:
+            results = self.search_symbols(question, k=k) or []
+            return [
+                r["node_id"]
+                for r in results
+                if r.get("node_id") in self.graph_engine.nodes_dict
+            ]
+        except Exception as e:
+            print(f"Error calling search_symbols: {e}")
+            return []
+
+    async def stream_general_explanation(
+        self, question: str, context_ids: list[str]
+    ) -> AsyncGenerator[str, None]:
+        """Answers a general project question using embedding-retrieved code
+        context (or a project symbol map when search is unavailable)."""
+        blocks = []
+        for cid in context_ids[:5]:
+            code = self.graph_engine.get_snippet(cid)
+            if code:
+                blocks.append(f"--- Relevant Symbol: {cid} ---\n{code}")
+        if blocks:
+            context_text = "\n\n".join(blocks)
+        else:
+            names = [
+                f"{node.name} ({node_id})"
+                for node_id, node in list(self.graph_engine.nodes_dict.items())[:80]
+            ]
+            context_text = (
+                "Project symbol map (no semantic search available):\n"
+                + "\n".join(names)
+            )
+
+        # Parenthesized string concatenation avoids syntax errors with internal quotes/backslashes
+        prompt = (
+            f"You are an expert codebase guide giving a DESCRIPTIVE overview.\n"
+            f"User Question: {question}\n\n"
+            f"Retrieved Project Context:\n"
+            f"{context_text}\n\n"
+            f"Describe, don't warn: explain what the relevant parts of the project are, "
+            f"how they work, and how they fit together, then answer the user's question directly. "
+            f"Name the symbols and files involved so the user can follow along. "
+            f"If the context is thin, say what you can and suggest what to look at next.\n"
+            f"MAXIMUM 150 WORDS."
+        )
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            stream=True,
+        )
+
+        async for chunk in response:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
     async def stream_explanation(
         self, question: str, target_id: str, impacted_ids: list[str]
     ) -> AsyncGenerator[str, None]:
@@ -60,15 +123,17 @@ class LLMAgent:
 
         # Parenthesized string concatenation avoids syntax errors with internal quotes/backslashes
         prompt = (
-            f"You are an expert codebase debugging assistant.\n"
+            f"You are an expert codebase debugging assistant doing a DEEP DIVE.\n"
             f"User Question: {question}\n\n"
             f"Target Symbol: {target_node.name} ({target_node.id})\n"
             f"Target Code:\n"
             f"```\n{target_code}\n```\n\n"
             f"Impacted/Dependent Symbols (Reverse BFS Depth 2):\n"
             f"{neighbors_text}\n\n"
-            f"Answer user's question first, then if the question is not clear, explain the context and the target symbol and the impacted symbols.\n"
-            f"Keep it direct and focused on risks. MAXIMUM 100 WORDS."
+            f"Answer in this order: (1) what the target symbol does and how the code works, "
+            f"(2) each impacted symbol and exactly why the change reaches it, "
+            f"(3) concrete risks and edge cases, (4) what to verify or refactor. "
+            f"Be thorough and specific — quote names and lines. MAXIMUM 300 WORDS."
         )
 
         response = await self.client.chat.completions.create(

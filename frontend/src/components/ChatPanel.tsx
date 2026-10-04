@@ -10,39 +10,81 @@ interface ChatPanelProps {
   nodes: GraphNode[]
   isStreaming: boolean
   error?: string
-  onAsk: (question: string) => void
+  onAsk: (question: string, nodeId?: string) => void
+  onNavigate: (id: string) => void
 }
 
-function renderMentionedText(text: ReactNode, names: string[]): ReactNode {
-  if (!names.length) return text
+export interface MentionTarget {
+  key: string
+  id: string
+}
+
+// Every symbol name and file path becomes a ride: longest keys first so
+// `src/api/users.ts` wins over `users` inside the same text.
+export function mentionTargets(nodes: GraphNode[]): MentionTarget[] {
+  const map = new Map<string, string>()
+  for (const node of nodes) {
+    if (node.name && !map.has(node.name)) map.set(node.name, node.id)
+    if (node.path && !map.has(node.path)) map.set(node.path, node.id)
+  }
+  return [...map.entries()]
+    .map(([key, id]) => ({ key, id }))
+    .sort((a, b) => b.key.length - a.key.length)
+}
+
+function renderMentionedText(
+  text: ReactNode,
+  targets: MentionTarget[],
+  onNavigate?: (id: string) => void,
+): ReactNode {
+  if (!targets.length) return text
   if (Array.isArray(text)) {
     return text.map((child, index) => (
-      <Fragment key={index}>{renderMentionedText(child, names)}</Fragment>
+      <Fragment key={index}>
+        {renderMentionedText(child, targets, onNavigate)}
+      </Fragment>
     ))
   }
   if (typeof text !== 'string') return text
-  const pattern = new RegExp(`(${names.map(escapeRegExp).join('|')})`, 'g')
-  return text.split(pattern).map((part, index) =>
-    names.includes(part) ? (
-      <mark className="node-mention" key={`${part}-${index}`}>
+  const pattern = new RegExp(
+    `(${targets.map((t) => escapeRegExp(t.key)).join('|')})`,
+    'g',
+  )
+  const byKey = new Map(targets.map((t) => [t.key, t.id]))
+  return text.split(pattern).map((part, index) => {
+    const id = byKey.get(part)
+    return id ? (
+      <button
+        type="button"
+        className="node-mention"
+        key={`${part}-${index}`}
+        title={`Go to ${part}`}
+        onClick={() => onNavigate?.(id)}
+      >
         {part}
-      </mark>
+      </button>
     ) : (
       part
-    ),
-  )
+    )
+  })
 }
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function MarkdownMessage({ text, nodes }: { text: string; nodes: GraphNode[] }) {
-  const names = useMemo(
-    () => nodes.map((node) => node.name).filter(Boolean),
-    [nodes],
-  )
-  const mention = (children: ReactNode) => renderMentionedText(children, names)
+export function MarkdownMessage({
+  text,
+  nodes,
+  onNavigate,
+}: {
+  text: string
+  nodes: GraphNode[]
+  onNavigate?: (id: string) => void
+}) {
+  const targets = useMemo(() => mentionTargets(nodes), [nodes])
+  const mention = (children: ReactNode) =>
+    renderMentionedText(children, targets, onNavigate)
 
   return (
     <Markdown
@@ -76,8 +118,10 @@ export function ChatPanel({
   isStreaming,
   error,
   onAsk,
+  onNavigate,
 }: ChatPanelProps) {
   const [question, setQuestion] = useState('')
+  const targets = useMemo(() => mentionTargets(nodes), [nodes])
 
   return (
     <div className="chat">
@@ -90,12 +134,13 @@ export function ChatPanel({
           >
             {message.text ? (
               message.role === 'assistant' ? (
-                <MarkdownMessage text={message.text} nodes={nodes} />
+                <MarkdownMessage
+                  text={message.text}
+                  nodes={nodes}
+                  onNavigate={onNavigate}
+                />
               ) : (
-                renderMentionedText(
-                  message.text,
-                  nodes.map((node) => node.name).filter(Boolean),
-                )
+                renderMentionedText(message.text, targets, onNavigate)
               )
             ) : (
               'Thinking...'

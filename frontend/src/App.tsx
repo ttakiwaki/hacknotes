@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 import "./App.css";
 import { ChatPanel } from "./components/ChatPanel";
 import { GraphCanvas } from "./components/GraphCanvas";
+import { PromptBar } from "./components/PromptBar";
 import { SnippetDrawer } from "./components/SnippetDrawer";
 import { mockEdges, mockNodes } from "./mocks/mockGraph";
 import { useGraphStore } from "./store/useGraphStore";
@@ -58,6 +59,8 @@ function App() {
   const impactedNodeIds = useGraphStore((s) => s.impactedNodeIds);
   const chatMessages = useGraphStore((s) => s.chatMessages);
   const isStreaming = useGraphStore((s) => s.isStreaming);
+  const promptMessages = useGraphStore((s) => s.promptMessages);
+  const isPromptStreaming = useGraphStore((s) => s.isPromptStreaming);
   const connectionStatus = useGraphStore((s) => s.connectionStatus);
   const error = useGraphStore((s) => s.error);
   const snippets = useGraphStore((s) => s.snippets);
@@ -72,6 +75,37 @@ function App() {
   const appendAssistantToken = useGraphStore((s) => s.appendAssistantToken);
 
   const socket = useMemo(() => new GraphSocket(), []);
+  // Universal navigation: every symbol path site-wide rides here —
+  // select it, fly the camera, and load its source.
+  const navigateToNode = (id: string) => {
+    selectNode(id);
+    useGraphStore.getState().requestFocus(id);
+    if (useMock) setSnippet(id, mockSnippet);
+    else socket.send({ type: "nodeClicked", id });
+  };
+
+  // Prompt-bar thread: separate messages so inspector chat stays clean.
+  // Either thread streaming blocks the other (one in-flight question).
+  const handleAskPrompt = (trimmedQuestion: string, nodeId?: string) => {
+    if (!trimmedQuestion || isStreaming || isPromptStreaming) return;
+    const store = useGraphStore.getState();
+    store.addPromptUserMessage(trimmedQuestion);
+    store.startPromptAssistantMessage();
+    if (useMock) {
+      store.appendAssistantToken(
+        "Mock backend: connect the server for embedding-backed project answers. Symbol matches still fly the camera.",
+      );
+      store.finishAssistantMessage();
+    } else {
+      socket.send({
+        type: "askAI",
+        question: trimmedQuestion,
+        ...(nodeId ? { nodeId } : {}),
+      });
+    }
+    // Guiding also opens the node: same ride as any site-wide path.
+    if (nodeId) navigateToNode(nodeId);
+  };
   const useMock = USE_MOCK;
   const repo = repoName(repositoryUrl);
 
@@ -215,10 +249,13 @@ function App() {
     if (searchMatch) handleNodeClick(searchMatch.id);
   };
 
-  const handleAsk = (trimmedQuestion: string) => {
+  const handleAsk = (trimmedQuestion: string, nodeId?: string) => {
     if (!trimmedQuestion || isStreaming) return;
     addUserMessage(trimmedQuestion);
     startAssistantMessage();
+    // Prefer the explicitly passed node (prompt bar already resolved and
+    // selected it); the closure's selectedNodeId may still be stale.
+    const targetId = nodeId ?? selectedNodeId;
     if (useMock) {
       setImpactedNodeIds([
         "src/api/users.ts::getUser::function",
@@ -233,7 +270,7 @@ function App() {
       socket.send({
         type: "askAI",
         question: trimmedQuestion,
-        ...(selectedNodeId ? { nodeId: selectedNodeId } : {}),
+        ...(targetId ? { nodeId: targetId } : {}),
       });
     }
   };
@@ -435,14 +472,24 @@ function App() {
                 )}
               </div>
             </div>
-            <GraphCanvas
-              nodes={visibleNodes}
-              edges={visibleEdges}
-              impactedNodeIds={impactedNodeIds}
-              selectedNodeId={selectedNodeId}
-              showDefines={showDefines}
-              onNodeClick={handleNodeClick}
-            />
+            <div className="graph-wrap">
+              <PromptBar
+                nodes={nodes}
+                disabled={isStreaming || isPromptStreaming}
+                streaming={isPromptStreaming}
+                messages={promptMessages}
+                onAsk={handleAskPrompt}
+                onNavigate={navigateToNode}
+              />
+              <GraphCanvas
+                nodes={visibleNodes}
+                edges={visibleEdges}
+                impactedNodeIds={impactedNodeIds}
+                selectedNodeId={selectedNodeId}
+                showDefines={showDefines}
+                onNodeClick={handleNodeClick}
+              />
+            </div>
           </div>
 
           {selectedNodeId && (
@@ -481,9 +528,10 @@ function App() {
                 <ChatPanel
                   messages={chatMessages}
                   nodes={nodes}
-                  isStreaming={isStreaming}
+                  isStreaming={isStreaming || isPromptStreaming}
                   error={error?.message}
                   onAsk={handleAsk}
+                  onNavigate={navigateToNode}
                 />
               </div>
             </aside>

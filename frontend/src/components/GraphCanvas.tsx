@@ -442,6 +442,26 @@ function GraphCanvasInner({
     onNodeClick(node.id);
   };
 
+  // External camera requests (prompt bar). Fires once per nonce; if the
+  // node isn't laid out yet it retries when layout lands, and drags never
+  // retrigger it because the handled nonce is remembered.
+  const focusNodeId = useGraphStore((s) => s.focusNodeId);
+  const focusNonce = useGraphStore((s) => s.focusNonce);
+  const lastFocusNonce = useRef(0);
+  useEffect(() => {
+    if (focusNonce === 0 || focusNonce === lastFocusNonce.current) return;
+    if (!focusNodeId) return;
+    const node = layoutedNodes.find((item) => item.id === focusNodeId);
+    if (!node) return;
+    const width = node.measured?.width ?? node.width ?? nodeWidth;
+    const height = node.measured?.height ?? node.height ?? nodeHeight;
+    void setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom: 1.1,
+      duration: 500,
+    });
+    lastFocusNonce.current = focusNonce;
+  }, [focusNonce, focusNodeId, layoutedNodes, setCenter]);
+
   return (
     <div className="graph-canvas">
       <ReactFlow

@@ -126,31 +126,42 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     # Target Resolution
                     target_id = llm_agent.resolve_target(msg.question, msg.node_id)
-                    if not target_id:
-                        err = ErrorMessage(
-                            code="SYMBOL_NOT_FOUND",
-                            message=f"Could not resolve target symbol for question: '{msg.question}'"
-                        )
-                        await websocket.send_text(err.model_dump_json(by_alias=True))
-                        continue
+                    if target_id:
+                        # Reverse Depth-2 BFS
+                        impacted_ids = graph_engine.get_impacted_nodes(target_id, max_depth=2)
 
-                    # Reverse Depth-2 BFS
-                    impacted_ids = graph_engine.get_impacted_nodes(target_id, max_depth=2)
+                        # Send highlightNodes first
+                        highlight_msg = HighlightNodes(ids=impacted_ids)
+                        await websocket.send_text(highlight_msg.model_dump_json(by_alias=True))
 
-                    # Send highlightNodes first
-                    highlight_msg = HighlightNodes(ids=impacted_ids)
-                    await websocket.send_text(highlight_msg.model_dump_json(by_alias=True))
+                        # Stream LLM tokens
+                        try:
+                            async for token in llm_agent.stream_explanation(msg.question, target_id, impacted_ids):
+                                chat_token = ChatToken(text=token)
+                                await websocket.send_text(chat_token.model_dump_json(by_alias=True))
 
-                    # Stream LLM tokens
-                    try:
-                        async for token in llm_agent.stream_explanation(msg.question, target_id, impacted_ids):
-                            chat_token = ChatToken(text=token)
-                            await websocket.send_text(chat_token.model_dump_json(by_alias=True))
+                            await websocket.send_text(ChatDone().model_dump_json(by_alias=True))
+                        except Exception as e:
+                            err = ErrorMessage(code="LLM_ERROR", message=f"LLM streaming failed: {str(e)}")
+                            await websocket.send_text(err.model_dump_json(by_alias=True))
+                    else:
+                        # General project question: no hard target. Retrieve
+                        # embedding-backed context, highlight it so the user
+                        # sees where, then answer generally.
+                        context_ids = llm_agent.find_context(msg.question, k=5)
 
-                        await websocket.send_text(ChatDone().model_dump_json(by_alias=True))
-                    except Exception as e:
-                        err = ErrorMessage(code="LLM_ERROR", message=f"LLM streaming failed: {str(e)}")
-                        await websocket.send_text(err.model_dump_json(by_alias=True))
+                        highlight_msg = HighlightNodes(ids=context_ids)
+                        await websocket.send_text(highlight_msg.model_dump_json(by_alias=True))
+
+                        try:
+                            async for token in llm_agent.stream_general_explanation(msg.question, context_ids):
+                                chat_token = ChatToken(text=token)
+                                await websocket.send_text(chat_token.model_dump_json(by_alias=True))
+
+                            await websocket.send_text(ChatDone().model_dump_json(by_alias=True))
+                        except Exception as e:
+                            err = ErrorMessage(code="LLM_ERROR", message=f"LLM streaming failed: {str(e)}")
+                            await websocket.send_text(err.model_dump_json(by_alias=True))
 
                 except ValidationError as e:
                     err = ErrorMessage(code="BAD_REQUEST", message=str(e))
