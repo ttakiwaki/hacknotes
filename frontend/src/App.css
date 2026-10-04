@@ -833,7 +833,7 @@ h2 {
 .messages {
   display: grid;
   gap: 10px;
-  max-height: 220px;
+  max-height: 320px;
   margin: 16px 0;
   overflow: auto;
   overscroll-behavior: none;
@@ -851,6 +851,82 @@ h2 {
 .message-assistant {
   color: var(--ink);
   background: var(--assistant-bg);
+  overflow-x: auto;
+}
+.message-assistant > :first-child {
+  margin-top: 0;
+}
+.message-assistant > :last-child {
+  margin-bottom: 0;
+}
+.message-assistant p,
+.message-assistant ul,
+.message-assistant ol,
+.message-assistant blockquote,
+.message-assistant pre,
+.message-assistant table {
+  margin: 0.55em 0;
+}
+.message-assistant h1,
+.message-assistant h2,
+.message-assistant h3,
+.message-assistant h4 {
+  margin: 0.7em 0 0.35em;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.message-assistant ul,
+.message-assistant ol {
+  padding-left: 1.3em;
+}
+.message-assistant li + li {
+  margin-top: 0.2em;
+}
+.message-assistant blockquote {
+  padding-left: 10px;
+  color: var(--muted);
+  border-left: 3px solid var(--line);
+}
+.message-assistant code {
+  padding: 0.1em 0.35em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  border-radius: 4px;
+}
+.message-assistant pre {
+  padding: 10px 12px;
+  overflow-x: auto;
+  background: var(--code-bg);
+  border-radius: 8px;
+}
+.message-assistant pre code {
+  padding: 0;
+  background: none;
+  font-size: 12px;
+  white-space: pre;
+}
+.message-assistant table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.message-assistant th,
+.message-assistant td {
+  padding: 4px 8px;
+  text-align: left;
+  border: 1px solid var(--line);
+}
+.message-assistant a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.message-assistant hr {
+  margin: 0.7em 0;
+  border: none;
+  border-top: 1px solid var(--line);
 }
 .node-mention {
   padding: 0 3px;

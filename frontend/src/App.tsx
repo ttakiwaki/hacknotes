@@ -221,7 +221,7 @@ function App() {
         "src/server.ts::startServer::function",
       ]);
       appendAssistantToken(
-        "Changing DatabasePool affects getUser and listUsers directly. startServer depends on getUser, so it is also in the impact path.",
+        "**Changing `DatabasePool`** affects these callers:\n\n- `getUser` and `listUsers` directly\n- `startServer` via `getUser`\n\n```ts\nawait pool.acquire()\n```\n",
       );
       useGraphStore.getState().finishAssistantMessage();
     } else {
