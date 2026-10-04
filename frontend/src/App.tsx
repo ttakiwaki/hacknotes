@@ -32,12 +32,13 @@ const mockSnippet = `export class DatabasePoolaaaaaaaaaaaaaaaaaa {
 }`;
 
 // Set to false to use the FastAPI/WebSocket backend.
-const USE_MOCK = false;
+const USE_MOCK = true;
 
 function App() {
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [hasStarted, setHasStarted] = useState(false);
   const [showDefines, setShowDefines] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     try {
       const saved = Number(localStorage.getItem("hacknotes-inspector-width"));
@@ -77,6 +78,39 @@ function App() {
   }, [theme]);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedSnippet = selectedNodeId ? snippets[selectedNodeId] : undefined;
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const matchingNodeIds = new Set(
+    nodes
+      .filter(
+        (node) =>
+          node.name.toLowerCase().includes(normalizedSearch) ||
+          node.path.toLowerCase().includes(normalizedSearch),
+      )
+      .map((node) => node.id),
+  );
+  const visibleNodeIds = normalizedSearch ? new Set(matchingNodeIds) : new Set(nodes.map((node) => node.id));
+
+  if (normalizedSearch) {
+    const pending = [...matchingNodeIds];
+    while (pending.length > 0) {
+      const sourceId = pending.shift();
+      if (!sourceId) continue;
+      edges.forEach((edge) => {
+        if (edge.source === sourceId && !visibleNodeIds.has(edge.target)) {
+          visibleNodeIds.add(edge.target);
+          pending.push(edge.target);
+        }
+      });
+    }
+  }
+
+  const visibleNodes = nodes.filter((node) => visibleNodeIds.has(node.id));
+  const visibleEdges = normalizedSearch
+    ? edges.filter(
+        (edge) =>
+          visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
+      )
+    : edges;
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -107,7 +141,10 @@ function App() {
     const next = Math.min(640, Math.max(280, rect.right - event.clientX));
     setInspectorWidth(next);
     try {
-      localStorage.setItem("hacknotes-inspector-width", String(Math.round(next)));
+      localStorage.setItem(
+        "hacknotes-inspector-width",
+        String(Math.round(next)),
+      );
     } catch {
       // ignore
     }
@@ -190,15 +227,23 @@ function App() {
           className={`workspace ${selectedNodeId ? "has-inspector" : ""}`}
           style={
             selectedNodeId
-              ? { gridTemplateColumns: `minmax(0, 1fr) 8px ${inspectorWidth}px` }
+              ? {
+                  gridTemplateColumns: `minmax(0, 1fr) 8px ${inspectorWidth}px`,
+                }
               : undefined
           }
         >
           <div className="graph-panel" id="graph">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">{repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}</p>
-                <h2>{nodes.length} symbols indexed</h2>
+                <p className="eyebrow">
+                  {repo ? `${repo} / DEPENDENCY GRAPH` : "DEPENDENCY GRAPH"}
+                </p>
+                <h2>
+                  {normalizedSearch
+                    ? `${visibleNodes.length} matching symbols`
+                    : `${nodes.length} symbols indexed`}
+                </h2>
               </div>
               <div className="graph-toolbar">
                 <button
@@ -233,6 +278,25 @@ function App() {
                 >
                   defines
                 </button>
+                <label className="graph-search">
+                  <span aria-hidden="true">⌕</span>
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search files or symbols"
+                    aria-label="Search files or symbols"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="clear-search"
+                      onClick={() => setSearchQuery("")}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </label>
                 <span className={`status status-${connectionStatus}`}>
                   <span className="status-dot" />
                   {useMock ? "mock graph" : connectionStatus}
@@ -243,8 +307,8 @@ function App() {
               </div>
             </div>
             <GraphCanvas
-              nodes={nodes}
-              edges={edges}
+              nodes={visibleNodes}
+              edges={visibleEdges}
               impactedNodeIds={impactedNodeIds}
               selectedNodeId={selectedNodeId}
               showDefines={showDefines}
@@ -256,7 +320,9 @@ function App() {
             <div
               className="resize-handle"
               onPointerDown={(event) => {
-                (event.target as HTMLElement).setPointerCapture(event.pointerId);
+                (event.target as HTMLElement).setPointerCapture(
+                  event.pointerId,
+                );
               }}
               onPointerMove={(event) => {
                 if (event.buttons === 1) handleResizeMove(event);

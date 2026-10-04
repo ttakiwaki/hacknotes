@@ -244,6 +244,38 @@ h2 { font-size: 20px; }
   gap: 18px;
 }
 
+.graph-search {
+  display: flex;
+  width: min(240px, 22vw);
+  min-width: 150px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  color: var(--muted);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.graph-search:focus-within { border-color: var(--dark); }
+.graph-search > span { font-size: 18px; line-height: 1; }
+.graph-search input { min-width: 0; flex: 1; color: var(--ink); background: transparent; border: 0; outline: 0; font-size: 12px; }
+.graph-search input::placeholder { color: #9a9b9f; }
+.clear-search {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+}
+.clear-search:hover { color: var(--ink); background: var(--line); }
+
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
 .status-connected .status-dot { background: var(--green); }
 
@@ -464,6 +496,7 @@ h2 { font-size: 20px; }
   .detail-panel { border-top: 1px solid var(--line); border-left: 0; }
   .graph-toolbar { gap: 8px; }
   .legend { display: none; }
+  .graph-search { width: min(190px, 42vw); min-width: 0; }
   .repository-form { flex-direction: column; padding: 8px; border-radius: 16px; }
   .repository-form button { min-height: 44px; }
 }
