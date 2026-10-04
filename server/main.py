@@ -1,5 +1,6 @@
 import json
 import os
+import asyncio
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,7 @@ from server.contracts import (
 )
 from server.graph_engine import GraphEngine
 from server.llm_agent import LLMAgent
+from server.repo_loader import RepoLoadError, load_repository
 
 # Attempt importing Victor's search_symbols library
 try:
@@ -79,8 +81,19 @@ async def websocket_endpoint(websocket: WebSocket):
             if msg_type == "loadRepository":
                 try:
                     msg = LoadRepository.model_validate(payload)
-                    repository_url = msg.repository_url
-                    print(f"Repository requested: {repository_url}")
+                    print(f"Repository requested: {msg.repository_url}")
+                    try:
+                        workspace = await asyncio.to_thread(
+                            load_repository, msg.repository_url, DB_PATH
+                        )
+                    except RepoLoadError as e:
+                        err = ErrorMessage(code="INTERNAL", message=str(e))
+                        await websocket.send_text(
+                            err.model_dump_json(by_alias=True)
+                        )
+                        continue
+                    # Snippets resolve against the fresh clone from here on.
+                    graph_engine.workspace_path = workspace
                     graph_engine.load_from_db()
                     graph_msg = GraphData(
                         nodes=list(graph_engine.nodes_dict.values()),
