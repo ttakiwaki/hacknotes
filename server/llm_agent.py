@@ -67,8 +67,8 @@ class LLMAgent:
             f"```\n{target_code}\n```\n\n"
             f"Impacted/Dependent Symbols (Reverse BFS Depth 2):\n"
             f"{neighbors_text}\n\n"
-            f"Explain concisely what might break or be affected when modifying `{target_node.name}`.\n"
-            f"Mention relevant function and class names clearly so the UI can highlight them. Keep it direct and focused on risks."
+            f"Answer user's question first, then if the question is not clear, explain the context and the target symbol and the impacted symbols.\n"
+            f"Keep it direct and focused on risks. MAXIMUM 100 WORDS."
         )
 
         response = await self.client.chat.completions.create(
