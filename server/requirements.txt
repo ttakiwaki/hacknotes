@@ -1,4 +1,4 @@
-git fastapi
+fastapi
 uvicorn
 websockets
 networkx

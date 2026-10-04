@@ -4,11 +4,15 @@ Local-first codebase visualizer with an AI debugger. Point it at a repo folder: 
 
 ## Setup (shared)
 
+One command (idempotent, safe to re-run). Checks tools, builds the
+indexer, creates `.venv` with all Python deps, pulls the embedding model,
+installs frontend deps, and creates `.env` if missing:
+
 ```bash
-cp .env.example .env
-# edit WORKSPACE_PATH (absolute path to the demo repo, e.g. iseo-player)
-# edit DB_PATH if you don't want ./index.db
+./setup.sh
 ```
+
+Then edit `.env` (or keep the defaults for a first run):
 
 Ollama (Victor's default embedding backend) must be installed locally, then:
 
