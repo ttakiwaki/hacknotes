@@ -18,6 +18,8 @@ const TSLanguage* tree_sitter_tsx(void);
 const TSLanguage* tree_sitter_typescript(void);
 const TSLanguage* tree_sitter_javascript(void);
 const TSLanguage* tree_sitter_python(void);
+const TSLanguage* tree_sitter_html(void);
+const TSLanguage* tree_sitter_css(void);
 }
 
 #ifndef QUERIES_DIR
@@ -43,26 +45,38 @@ struct Lang {
   int new_idx;           // constructor-call pattern, -1 when absent
   int imp_start, imp_end;  // IMPORTS patterns [imp_start, imp_end)
   bool python;           // import specs are dotted names, not quoted strings
+  const char* imp_keys[2];  // when n_imp_keys > 0, @imp.key text must be one
+  int n_imp_keys;           // of these (HTML href/src, CSS url())
 };
 
 static const Lang LANG_TS = {tree_sitter_typescript, "tsx.scm",
                              {"function", "function", "class", "function"},
-                             4, 4, 5, 6, 8, false};
+                             4, 4, 5, 6, 8, false, {}, 0};
 static const Lang LANG_TSX = {tree_sitter_tsx, "tsx.scm",
                               {"function", "function", "class", "function"},
-                              4, 4, 5, 6, 8, false};
+                              4, 4, 5, 6, 8, false, {}, 0};
 static const Lang LANG_JS = {tree_sitter_javascript, "js.scm",
                              {"function", "function", "class", "function"},
-                             4, 4, 5, 6, 8, false};
+                             4, 4, 5, 6, 8, false, {}, 0};
 static const Lang LANG_PY = {tree_sitter_python, "py.scm",
                              {"function", "class", "function"},
-                             3, 3, -1, 4, 7, true};
+                             3, 3, -1, 4, 7, true, {}, 0};
+// HTML/CSS contribute file nodes + IMPORTS only (no symbol definitions:
+// ndef=0, every pattern is an import).
+static const Lang LANG_HTML = {tree_sitter_html, "html.scm",
+                               {"", "", "", ""},
+                               0, -1, -1, 0, 2, false, {"href", "src"}, 2};
+static const Lang LANG_CSS = {tree_sitter_css, "css.scm",
+                              {"", "", "", ""},
+                              0, -1, -1, 0, 2, false, {"url"}, 1};
 
 static const Lang* lang_for(const std::string& ext) {
   if (ext == ".ts") return &LANG_TS;
   if (ext == ".tsx") return &LANG_TSX;
   if (ext == ".js" || ext == ".jsx") return &LANG_JS;
   if (ext == ".py") return &LANG_PY;
+  if (ext == ".html") return &LANG_HTML;
+  if (ext == ".css") return &LANG_CSS;
   return nullptr;
 }
 
@@ -152,14 +166,17 @@ static std::string resolve_import(const std::string& workspace,
   if (spec[0] != '.') return "";
   const fs::path base = (fs::path(workspace) / rel).parent_path() / spec;
   const std::string ext = base.extension().string();
-  if (ext == ".ts" || ext == ".tsx" || ext == ".js" || ext == ".jsx") {
+  if (ext == ".ts" || ext == ".tsx" || ext == ".js" || ext == ".jsx" ||
+      ext == ".html" || ext == ".css") {
     const std::string r = fs::relative(base, workspace, ec).generic_string();
     if (!ec && r.rfind("..", 0) != 0 && fileset.count(r)) return r;
     return "";
   }
-  std::string hit = try_cands(base, {".ts", ".tsx", ".js", ".jsx"});
+  std::string hit = try_cands(base, {".ts", ".tsx", ".js", ".jsx",
+                                     ".html", ".css"});
   if (!hit.empty()) return hit;
-  return try_cands(base, {"/index.ts", "/index.tsx", "/index.js", "/index.jsx"});
+  return try_cands(base, {"/index.ts", "/index.tsx", "/index.js", "/index.jsx",
+                          "/index.html"});
 }
 
 int index_symbols(const std::string& workspace, const std::string& db_path,
@@ -170,7 +187,8 @@ int index_symbols(const std::string& workspace, const std::string& db_path,
     TSQuery* query;
   };
   std::vector<Loaded> loaded;
-  const Lang* all_langs[4] = {&LANG_TS, &LANG_TSX, &LANG_JS, &LANG_PY};
+  const Lang* all_langs[6] = {&LANG_TS, &LANG_TSX, &LANG_JS,
+                              &LANG_PY, &LANG_HTML, &LANG_CSS};
   std::unordered_map<std::string, std::string> query_text;
   for (const Lang* L : all_langs) {
     if (!query_text.count(L->query_file)) {
@@ -314,17 +332,33 @@ int index_symbols(const std::string& workspace, const std::string& db_path,
       if ((int)m.pattern_index < ld->lang->ndef) continue;
       if ((int)m.pattern_index >= ld->lang->imp_start) {
         // IMPORTS: file -> file, resolved against the files table.
-        TSNode path = {0};
-        bool has_path = false;
+        TSNode path = {0}, key = {0};
+        bool has_path = false, has_key = false;
         for (uint32_t i = 0; i < m.capture_count; ++i) {
           uint32_t len = 0;
           const char* cap = ts_query_capture_name_for_id(ld->query, m.captures[i].index, &len);
-          if (std::string(cap, len) == "imp.path") { path = m.captures[i].node; has_path = true; }
+          const std::string cn(cap, len);
+          if (cn == "imp.path") { path = m.captures[i].node; has_path = true; }
+          if (cn == "imp.key") { key = m.captures[i].node; has_key = true; }
         }
         if (ts_node_is_null(path) || !has_path) continue;
+        // Gated imports: when the pattern captured a key (HTML href/src,
+        // CSS url()), it must be an allowed one. Patterns without a key
+        // (CSS bare strings, all C-family imports) pass through.
+        if (has_key && !ts_node_is_null(key)) {
+          const std::string ktext = node_text(src, key);
+          bool allowed = false;
+          for (int ki = 0; ki < ld->lang->n_imp_keys; ++ki)
+            if (ktext == ld->lang->imp_keys[ki]) { allowed = true; break; }
+          if (!allowed) continue;
+        }
         std::string spec = node_text(src, path);
-        if (!ld->lang->python && spec.size() >= 2)
-          spec = spec.substr(1, spec.size() - 2);  // strip quotes
+        // Strip matching quotes (CSS strings carry them; HTML attribute
+        // values and Python dotted names never do).
+        if (!ld->lang->python && spec.size() >= 2 &&
+            ((spec.front() == '"' && spec.back() == '"') ||
+             (spec.front() == '\'' && spec.back() == '\'')))
+          spec = spec.substr(1, spec.size() - 2);
         const std::string tres =
             resolve_import(workspace, fileset, rel, spec, ld->lang->python);
         if (tres.empty()) { ++skipped_external; continue; }
