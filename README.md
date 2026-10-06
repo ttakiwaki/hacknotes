@@ -1,94 +1,119 @@
 # Uxie
 
-Local-first codebase visualizer with an AI debugger. Point it at a repo folder: Josh indexes it into SQLite, Victor embeds symbols, Ben serves graph + LLM over WebSocket, Cameron renders the UI.
+**A local-first codebase visualizer with an AI debugger.**
 
-## Setup (shared)
+Point Uxie at a repo folder (or a git URL) and it turns the code into an interactive graph of files, functions, and classes. Then ask questions like *"What breaks if I change `DatabasePool`?"* and get answers grounded in the actual call graph, not just a guess.
 
-One command (idempotent, safe to re-run). Checks tools, builds the
-indexer, creates `.venv` with all Python deps, pulls the embedding model,
-installs frontend deps, and creates `.env` if missing:
+> Built at **StormHacks 2026**.
+
+---
+
+## Why Uxie
+
+Dropping into an unfamiliar codebase means grepping, jumping between files, and building a mental map from scratch. Uxie builds that map for you:
+
+- **See the structure.** Files, symbols, calls, and imports rendered as a navigable graph.
+- **Ask in plain English.** Semantic search finds the relevant symbols, and the LLM reasons over them and their neighbors in the graph.
+- **Stay local.** Indexing and embeddings run on your machine by default (SQLite + Ollama). Your code doesn't have to leave your laptop.
+
+## How it works
+
+```
+ repo folder / git URL
+          │
+          ▼
+┌───────────────────┐     files / nodes / edges
+│  Indexer  (C++)   │ ──────────────────────────┐
+│  tree-sitter      │                           ▼
+└───────────────────┘                  ┌─────────────────┐
+                                       │  SQLite (WAL)   │
+┌───────────────────┐   vectors        │  files, nodes,  │
+│ Embeddings (Py)   │ ───────────────► │  edges,         │
+│ Ollama / Voyage / │                  │  embeddings     │
+│ OpenAI            │ ◄─────────────── └────────┬────────┘
+└───────────────────┘   search_symbols          │
+          ▲                                     │
+          │                                     ▼
+          │                           ┌───────────────────┐   WebSocket   ┌──────────────┐
+          └────────────────────────── │  Server (Python)  │ ◄───────────► │  UI (React)  │
+                                      │  graph + LLM      │               │  Vite        │
+                                      └───────────────────┘               └──────────────┘
+```
+
+1. **Index.** The C++ indexer walks the workspace, parses supported files with tree-sitter, and writes `files`, `nodes`, and `edges` into SQLite.
+2. **Embed.** The embeddings library embeds each symbol and stores vectors in the same database. Only nodes whose hash changed are re-embedded.
+3. **Serve.** The server loads the graph, runs semantic search for a question, pulls in the surrounding call graph, and sends context to the LLM. Everything is streamed to the UI over WebSocket.
+4. **Render.** The UI draws the graph and the debugger chat.
+
+## Tech stack
+
+| Layer | Tech |
+| --- | --- |
+| Indexer | C++17, CMake, tree-sitter |
+| Storage | SQLite (WAL mode) |
+| Embeddings | Python 3.10+, NumPy, Ollama (`nomic-embed-text`) by default; Voyage and OpenAI supported |
+| Server | Python, WebSocket |
+| UI | React, Vite |
+
+**Supported languages:** TypeScript, JavaScript (`.ts` `.tsx` `.js` `.jsx`), Python (`.py`), HTML, CSS.
+
+## Quick start
+
+**Prerequisites:** Python 3.10+, Node.js, CMake and a C++17 compiler, git, and [Ollama](https://ollama.com) (for the default embedding backend).
 
 ```bash
 ./setup.sh
 ```
 
-Then edit `.env` (or keep the defaults for a first run):
+The script is idempotent and safe to re-run. It checks your tools, builds the indexer, creates `.venv` with all Python dependencies, pulls the embedding model, installs frontend dependencies, and creates `.env` if it's missing.
 
-Ollama (Victor's default embedding backend) must be installed locally, then:
-
-```bash
-ollama pull nomic-embed-text
-```
-
-## Victor — embeddings (`embeddings/`)
-
-Python 3.10+, `numpy`. Library imported by Ben's server. No extra process.
+Then edit `.env` (or keep the defaults for a first run) and run the pipeline:
 
 ```bash
-/usr/bin/python3 -m venv .venv   # use system Python, not Cursor's `python` shim
+# 1. Index a repo
+./indexer/build/indexer /path/to/your/repo ./uxie.db
+
+# 2. Embed its symbols
 source .venv/bin/activate
-pip install -r embeddings/requirements.txt
-```
-
-Run from the **repo root** (so `from embeddings import search_symbols` works).
-
-Hour-one mock DB (CONTRACTS.md sample graph) if Josh's indexer DB is not ready:
-
-```bash
-python -m embeddings seed
-# writes embeddings/dev/sample.db and embeddings/dev/sample_workspace/
-```
-
-Index (only re-embeds nodes whose `nodes.hash` changed):
-
-```bash
-# against Josh's DB (uses WORKSPACE_PATH and DB_PATH from .env)
 python -m embeddings index
 
-# against the mock:
-python -m embeddings index \
-  --db embeddings/dev/sample.db \
-  --workspace embeddings/dev/sample_workspace
+# 3. Start the server
+cd server && npm run start-server
+
+# 4. Start the UI (http://localhost:5173)
+cd ui && npm run dev
 ```
 
-Search (same model as indexing):
+> If you don't have your own repo handy, use the bundled mock graph. See [Mock data](#mock-data).
 
-```bash
-python -m embeddings search "What breaks if I change DatabasePool?" -k 5
-python -m embeddings search "connection pool" --db embeddings/dev/sample.db
-```
+## Configuration
 
-Ben's import (server should put the repo root on `sys.path` / `PYTHONPATH`):
+Set these in `.env` at the repo root.
 
-```python
-from embeddings import search_symbols
+| Variable | Description | Default |
+| --- | --- | --- |
+| `WORKSPACE_PATH` | Path to the repo being analyzed | n/a |
+| `DB_PATH` | Path to the SQLite database | n/a |
+| `EMBEDDING_PROVIDER` | `ollama`, `voyage`, or `openai` | `ollama` |
+| `EMBEDDING_MODEL` | Embedding model name | `nomic-embed-text` |
+| `EMBEDDING_API_KEY` | API key (Voyage / OpenAI only) | n/a |
+| `OLLAMA_HOST` | Custom Ollama host (optional) | local default |
 
-hits = search_symbols(query, k)  # [{"node_id": str, "score": float}, ...] best first
-```
+<!-- TODO: add the LLM provider / API key variables used by the server -->
 
-`search_symbols` reads `DB_PATH` and embedding env vars. Returns `[]` if the embeddings table is empty. Raises if the provider is unreachable.
+---
 
-Env: `EMBEDDING_PROVIDER` (`ollama` | `voyage` | `openai`, default `ollama`), `EMBEDDING_MODEL` (default `nomic-embed-text`), `EMBEDDING_API_KEY` (voyage/openai), `DB_PATH`, `WORKSPACE_PATH`, optional `OLLAMA_HOST`.
+## Components
 
-Vectors: raw little-endian float32 BLOBs in `embeddings(node_id, hash, vector)`. WAL is enabled on connect.
+### Indexer (`indexer/`)
 
-Tests (no Ollama required):
+A C++17 CLI that walks a workspace, parses it with tree-sitter, and writes the contract tables with stable `path::name::type` IDs, WAL mode, and 1-indexed line numbers.
 
-```bash
-python -m unittest embeddings.test_embeddings
-```
+- **CALLS** edges are resolved by name matching: same-file match wins, otherwise a unique repo-wide match, otherwise skipped.
+- **IMPORTS** edges are file→file (relative imports and Python dotted names).
+- **Incremental:** unchanged files (by hash) are skipped, and deleted files are purged.
 
-## Josh — indexer (`indexer/`)
-
-C++17 CLI. Walks a workspace (`.ts` / `.tsx` / `.js` / `.jsx` / `.py` /
-`.html` / `.css`),
-parses it with tree-sitter, and writes the `files` / `nodes` / `edges`
-contract tables (stable `path::name::type` ids, WAL, 1-indexed lines).
-CALLS by name matching (same-file wins, else unique repo-wide, else
-skipped), IMPORTS file→file (relative + py dotted names), incremental by
-file hash (unchanged files skipped, deleted files purged).
-
-Build (first configure downloads the tree-sitter grammars, needs network):
+Build (the first configure downloads the tree-sitter grammars, so it needs network access):
 
 ```bash
 cmake -B indexer/build -S indexer
@@ -102,55 +127,104 @@ Run:
 ./indexer/build/indexer --help   # --db, --full, --clean, --queries, -q/-v
 ```
 
-Git URLs are shallow-cloned to a temp dir and deleted after (private repos
-work when `git` itself can auth). Reruns skip unchanged files; `--full`
-forces a reparse, `--clean` wipes the db first. Exit codes: 0 ok, 1 runtime
-error, 2 bad usage.
+Git URLs are shallow-cloned to a temp directory and deleted afterward (private repos work when `git` itself can authenticate). Use `--full` to force a reparse and `--clean` to wipe the DB first.
 
-Root `sample.db` is the CONTRACTS.md Section 7 mock graph (7 nodes,
-9 edges), regenerable via
-`./indexer/build/indexer indexer/sample-workspace sample.db`.
-Full docs in `indexer/CHANGES.md`.
+Exit codes: `0` ok, `1` runtime error, `2` bad usage. Full details are in [`indexer/CHANGES.md`](indexer/CHANGES.md).
 
-## Ben — server (`server/`)
+### Embeddings (`embeddings/`)
 
-From the `server/` directory, set up and activate a Python virtual environment (`venv`):
+A Python library imported by the server. There's no extra process to run.
 
-#### macOS / Linux:
+```bash
+/usr/bin/python3 -m venv .venv   # use system Python, not an editor's `python` shim
+source .venv/bin/activate
+pip install -r embeddings/requirements.txt
+```
+
+Run everything from the **repo root** so `from embeddings import search_symbols` resolves.
+
+```bash
+# Embed symbols (only re-embeds nodes whose hash changed)
+python -m embeddings index
+
+# Semantic search from the CLI
+python -m embeddings search "What breaks if I change DatabasePool?" -k 5
+```
+
+Using it from the server (put the repo root on `sys.path` / `PYTHONPATH`):
+
+```python
+from embeddings import search_symbols
+
+hits = search_symbols(query, k)  # [{"node_id": str, "score": float}, ...], best first
+```
+
+`search_symbols` reads `DB_PATH` and the embedding env vars. It returns `[]` if the embeddings table is empty and raises if the provider is unreachable.
+
+Vectors are stored as raw little-endian float32 BLOBs in `embeddings(node_id, hash, vector)`.
+
+### Server (`server/`)
+
+Serves the graph and the LLM-backed debugger over WebSocket.
+
 ```bash
 cd server
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate        # Windows (cmd): venv\Scripts\activate.bat
+                                # Windows (PowerShell): venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
-
-#### Windows (Command Prompt):
-```cmd
-cd server
-python -m venv venv
-venv\Scripts\activate.bat
-pip install -r requirements.txt
-```
-
-#### Windows (PowerShell):
-```powershell
-cd server
-python -m venv venv
-venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-### Run the server
-```
 npm run start-server
 ```
 
-## Cameron — UI (`ui/`)
+<!-- TODO: document the WebSocket message types / protocol briefly -->
 
-React + Vite on port 5173 — not wired up yet.
+### UI (`ui/`)
 
-## Status
+React + Vite, served at `http://localhost:5173`.
 
-- Victor: embeddings index + `search_symbols` ready; mock seed for hour one.
-- Josh: indexer pipeline complete (walk, parse, CALLS/IMPORTS, incremental, `sample.db`).
-- Ben / Cameron: see their sections.
+<!-- TODO: describe the graph view, node details panel, and debugger chat -->
+
+---
+
+## Data model
+
+All components communicate through one SQLite database.
+
+| Table | Contents |
+| --- | --- |
+| `files` | Indexed source files and their content hashes |
+| `nodes` | Symbols (functions, classes, etc.) with stable `path::name::type` IDs and line ranges |
+| `edges` | `CALLS` (symbol→symbol) and `IMPORTS` (file→file) relationships |
+| `embeddings` | `(node_id, hash, vector)`, one vector per symbol |
+
+The full schema lives in `CONTRACTS.md`.
+
+## Mock data
+
+Don't have a repo to index? Use the bundled sample graph (7 nodes, 9 edges):
+
+```bash
+# Prebuilt at the repo root: sample.db
+# Regenerate it:
+./indexer/build/indexer indexer/sample-workspace sample.db
+
+# Or seed the embeddings dev DB and workspace:
+python -m embeddings seed
+python -m embeddings index \
+  --db embeddings/dev/sample.db \
+  --workspace embeddings/dev/sample_workspace
+python -m embeddings search "connection pool" --db embeddings/dev/sample.db
+```
+
+## Testing
+
+```bash
+python -m unittest embeddings.test_embeddings   # no Ollama required
+```
+
+## What's next
+ 
+- Smarter call resolution (scope and type aware)
+- More languages (Go, Rust, Java, C/C++)
+- Live re-indexing on file changes
+- Richer graph filtering and layouts
